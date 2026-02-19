@@ -15,7 +15,8 @@ This file captures repository handoff details required before GitHub ownership t
 - [x] Architecture baseline exists (`docs/architecture.md`)
 - [x] TRD + PRD alignment exists (`docs/trd-integrated-document-viewer-platform.md`)
 - [x] UML flow documentation exists for submit/status/preview (`docs/diagrams/*-flow.md`)
-- [x] Acceptance mapping updated for AC-1 ~ AC-9 in architecture/TRD docs
+- [x] Acceptance mapping updated for AC-1 ~ AC-14 in architecture/TRD docs
+- [x] PR review bot workflow prepared (`@coderabbitai` mention on PR comment)
 - [ ] License file added
 - [ ] Explicit `CODEOWNERS` set to transfer team
 - [ ] CI/security workflow files added for long-term governance
