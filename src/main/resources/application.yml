@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: clearfolio-viewer
+  servlet:
+    multipart:
+      max-file-size: ${conversion.max-upload-size-bytes}
+      max-request-size: ${conversion.max-upload-size-bytes}
+
+conversion:
+  blocked-extensions:
+    - hwp
+    - hwpx
+  worker-threads: 4
+  queue-capacity: 200
+  max-retry-attempts: 3
+  retry-initial-delay-ms: 500
+  retry-max-delay-ms: 5000
+  retry-backoff-multiplier: 2.0
+  max-upload-size-bytes: 5242880
