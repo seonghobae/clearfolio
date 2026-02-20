@@ -5,6 +5,8 @@ import java.util.UUID;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +25,8 @@ import com.clearfolio.viewer.api.ApiErrorResponse;
  */
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     /**
      * Handles blocked or unsupported document format requests.
@@ -158,11 +162,13 @@ public class ApiExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleUnexpected(
             Exception ex,
             HttpServletRequest request) {
+        String traceId = resolveTraceId(request);
+        LOGGER.error("Unexpected error on path={} traceId={}", request.getRequestURI(), traceId, ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ApiErrorResponse(
                         "INTERNAL_ERROR",
                         "Unexpected error",
-                        resolveTraceId(request),
+                        traceId,
                         Map.of()
                 ));
     }

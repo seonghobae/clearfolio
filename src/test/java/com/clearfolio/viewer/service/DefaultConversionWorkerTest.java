@@ -232,6 +232,40 @@ class DefaultConversionWorkerTest {
     }
 
     @Test
+    void workerDeadLettersProcessingJobWhenExecutorIsRejected() {
+        Executor rejectingExecutor = command -> {
+            throw new RejectedExecutionException("queue full");
+        };
+
+        ConversionJobRepository repository = new InMemoryConversionJobRepository();
+        ConversionProperties conversionProperties = new ConversionProperties();
+
+        UUID jobId = UUID.randomUUID();
+        ConversionJob job = new ConversionJob(
+                jobId,
+                "report.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "abc-processing",
+                12L,
+                3
+        );
+        assertTrue(job.markProcessing("already processing"));
+        repository.save(job);
+
+        DefaultConversionWorker worker = new DefaultConversionWorker(
+                repository,
+                rejectingExecutor,
+                conversionProperties
+        );
+
+        worker.enqueue(jobId);
+
+        assertEquals(ConversionJobStatus.FAILED, job.getStatus());
+        assertTrue(job.isDeadLettered());
+        assertEquals("worker queue saturated", job.getStatusMessage());
+    }
+
+    @Test
     void workerIgnoresMissingJobWhenExecutorRejectsEnqueue() {
         Executor rejectingExecutor = command -> {
             throw new RejectedExecutionException("queue full");
@@ -245,6 +279,76 @@ class DefaultConversionWorkerTest {
         );
 
         assertDoesNotThrow(() -> worker.enqueue(UUID.randomUUID()));
+    }
+
+    @Test
+    void scheduleRetryDeadLettersJobWhenExecutorRejectsDelayedExecution() throws Exception {
+        Executor rejectingExecutor = command -> {
+            throw new RejectedExecutionException("queue full");
+        };
+
+        ConversionJobRepository repository = new InMemoryConversionJobRepository();
+        ConversionProperties conversionProperties = new ConversionProperties();
+
+        UUID jobId = UUID.randomUUID();
+        ConversionJob job = new ConversionJob(
+                jobId,
+                "report.docx",
+                "application/octet-stream",
+                "hash-schedule-reject",
+                10L,
+                3
+        );
+        repository.save(job);
+
+        DefaultConversionWorker worker = new DefaultConversionWorker(
+                repository,
+                rejectingExecutor,
+                conversionProperties,
+                id -> "/artifacts/" + id + ".pdf"
+        );
+
+        invokeScheduleRetry(worker, jobId, Instant.now().plusMillis(10));
+        await(job::isDeadLettered, 1_000);
+
+        assertEquals(ConversionJobStatus.FAILED, job.getStatus());
+        assertEquals("worker queue saturated", job.getStatusMessage());
+    }
+
+    @Test
+    void scheduleRetryRejectionDoesNotDowngradeAlreadySucceededJob() throws Exception {
+        Executor rejectingExecutor = command -> {
+            throw new RejectedExecutionException("queue full");
+        };
+
+        ConversionJobRepository repository = new InMemoryConversionJobRepository();
+        ConversionProperties conversionProperties = new ConversionProperties();
+
+        UUID jobId = UUID.randomUUID();
+        ConversionJob job = new ConversionJob(
+                jobId,
+                "report.docx",
+                "application/octet-stream",
+                "hash-already-succeeded",
+                10L,
+                3
+        );
+        job.markSucceeded("/artifacts/" + jobId + ".pdf", "already done");
+        repository.save(job);
+
+        DefaultConversionWorker worker = new DefaultConversionWorker(
+                repository,
+                rejectingExecutor,
+                conversionProperties,
+                id -> "/artifacts/" + id + ".pdf"
+        );
+
+        invokeScheduleRetry(worker, jobId, Instant.now().plusMillis(10));
+        Thread.sleep(75);
+
+        assertEquals(ConversionJobStatus.SUCCEEDED, job.getStatus());
+        assertFalse(job.isDeadLettered());
+        assertEquals("already done", job.getStatusMessage());
     }
 
     @Test

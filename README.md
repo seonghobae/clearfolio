@@ -4,6 +4,17 @@ This repository contains the MVP backend for an integrated document viewer platf
 The current implementation includes non-blocking submit, job status polling, and
 an asynchronous conversion simulation for early pattern validation.
 
+## Quick Start
+
+1. Build and verify compilation:
+   - `mvn -DskipTests compile`
+2. Run tests:
+   - `mvn test`
+3. Start the app locally:
+   - `mvn spring-boot:run`
+4. Check readiness:
+   - `curl -sS http://localhost:8080/healthz`
+
 ## Scope
 
 - `POST /api/v1/convert/jobs`: upload document and receive async job id.
@@ -20,8 +31,8 @@ an asynchronous conversion simulation for early pattern validation.
 - API contract has been kept backward-compatible with the existing jobs + viewer flow.
 - `GET /viewer/{docId}` remains the canonical entry route.
 - Alias endpoints remain stable in behavior and response shape expectations.
-- `DEAD_LETTERED` jobs are returned as 409 (same surface as failed state) so
-  client-side state handling can treat terminal retry-exhausted cases consistently.
+- Dead-letter terminal cases keep `status=FAILED` in API payloads and set
+  `deadLettered=true` when retries are exhausted.
 
 ## Acceptance gates (current)
 
@@ -38,6 +49,7 @@ an asynchronous conversion simulation for early pattern validation.
 ## Documentation references
 
 - `docs/architecture.md`
+- `docs/prd-integrated-document-viewer-platform.md`
 - `docs/trd-integrated-document-viewer-platform.md`
 - `docs/diagrams/submit-flow.md`
 - `docs/diagrams/status-flow.md`

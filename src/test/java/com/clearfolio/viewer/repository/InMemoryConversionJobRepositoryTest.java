@@ -98,6 +98,17 @@ class InMemoryConversionJobRepositoryTest {
     }
 
     @Test
+    void saveDoesNotIndexBlankContentHash() throws Exception {
+        InMemoryConversionJobRepository repository = new InMemoryConversionJobRepository();
+        ConversionJob job = newJob("   ");
+
+        repository.save(job);
+
+        assertTrue(repository.findById(job.getJobId()).isPresent());
+        assertTrue(jobsByContentHash(repository).isEmpty());
+    }
+
+    @Test
     void findOrStoreSavesCandidateWhenHashIsNull() throws Exception {
         InMemoryConversionJobRepository repository = new InMemoryConversionJobRepository();
         ConversionJob candidate = newJob(null);

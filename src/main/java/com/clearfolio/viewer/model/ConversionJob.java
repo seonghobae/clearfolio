@@ -245,6 +245,10 @@ public class ConversionJob {
             return false;
         }
 
+        if (attemptCount >= maxAttempts) {
+            return false;
+        }
+
         if (retryAt != null && retryAt.isAfter(Instant.now())) {
             return false;
         }
@@ -276,6 +280,8 @@ public class ConversionJob {
      */
     public synchronized void markRetryScheduled(String message, Instant retryAt) {
         this.status = ConversionJobStatus.SUBMITTED;
+        this.startedAt = null;
+        this.completedAt = null;
         this.retryAt = retryAt;
         this.deadLettered = false;
         this.statusMessage = sanitize(message);

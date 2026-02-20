@@ -58,7 +58,7 @@ sequenceDiagram
     Repo-->>Svc: ConversionJob
     Svc-->>Ctl: job snapshot
 
-    alt job.status in FAILED or DEAD_LETTERED
+    alt job.status = FAILED
       Ctl-->>V: 409 + ApiErrorResponse { errorCode: CONFLICT, code: CONFLICT, message, details, traceId } for viewer entry point (message includes terminal status)
 
     else job.status in SUBMITTED or PROCESSING
@@ -91,7 +91,6 @@ sequenceDiagram
 
 - Missing job and conversion record (404).
 - Job not ready for bootstrap (SUBMITTED/PROCESSING) or failed conversion result (FAILED).
-- Failed conversion with explicit reason.
-- `DEAD_LETTERED` shares the same 409 terminal path with clearer status message.
+- Failed conversion with explicit reason; retry-exhausted failures remain `FAILED` with `deadLettered=true`.
 - Preview service timeout or authorization failure with traceable error path (planned extension).
 - HWP/HWPX and manual policy path: preview path only allowed after successful exception policy resolution (planned extension).

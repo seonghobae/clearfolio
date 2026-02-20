@@ -57,17 +57,17 @@ This repository currently ships a MVP scaffold, not a production-grade Pattern B
 - HWP/HWPX are blocked through configuration and file-extension validation.
 - HWP/HWPX exception handling is documented in diagrams as a future manual-approval lane.
 - NUL characters are sanitized when writing job metadata.
-- Preview shell and `GET /viewer/{docId}` endpoint behavior is implemented for bootstrap-on-success (`200`) and conflict responses for `SUBMITTED`/`PROCESSING`/`FAILED`/`DEAD_LETTERED` (`409`), plus `404` when missing; full preview-session orchestration and token bootstrap are still planned.
+- Preview shell and `GET /viewer/{docId}` endpoint behavior is implemented for bootstrap-on-success (`200`) and conflict responses for `SUBMITTED`/`PROCESSING`/`FAILED` (`409`, including dead-lettered failures where `deadLettered=true`), plus `404` when missing; full preview-session orchestration and token bootstrap are still planned.
 
 ## AC alignment (current)
 
 | AC | Requirement | Status | Evidence |
 |---|---|---|---|
 | AC-01 | Non-blocking submit returns 202 with `jobId`/`statusUrl` | `IMPLEMENTED` | `docs/diagrams/submit-flow.md`, `docs/trd-integrated-document-viewer-platform.md` |
-| AC-02 | Status supports `SUBMITTED`/`PROCESSING`/`SUCCEEDED`/`FAILED`/`DEAD_LETTERED` lifecycle | `IMPLEMENTED` | `docs/diagrams/status-flow.md`, `src/main/java/com/clearfolio/viewer/model/ConversionJobStatus.java` |
+| AC-02 | Status supports `SUBMITTED`/`PROCESSING`/`SUCCEEDED`/`FAILED` lifecycle with terminal retry-exhausted state represented as `FAILED` + `deadLettered=true` | `IMPLEMENTED` | `docs/diagrams/status-flow.md`, `src/main/java/com/clearfolio/viewer/model/ConversionJobStatus.java` |
 | AC-03 | HWP/HWPX blocked by default | `IMPLEMENTED` | `docs/diagrams/submit-flow.md`, `src/main/java/com/clearfolio/viewer/service/DefaultDocumentValidationService.java`, `src/main/resources/application.yml` |
 | AC-04 | WAS preview prefetch via S2S | `PLANNED` | `docs/diagrams/preview-flow.md` |
-| AC-05 | `/viewer/{docId}` state-gated responses (`200 SUCCEEDED`, `409` for `SUBMITTED`/`PROCESSING`/`FAILED`/`DEAD_LETTERED`, `404 not found`) | `IMPLEMENTED (MVP)` | `docs/diagrams/preview-flow.md`, `src/main/java/com/clearfolio/viewer/controller/ConversionController.java` |
+| AC-05 | `/viewer/{docId}` state-gated responses (`200 SUCCEEDED`, `409` for `SUBMITTED`/`PROCESSING`/`FAILED` including dead-lettered failures, `404 not found`) | `IMPLEMENTED (MVP)` | `docs/diagrams/preview-flow.md`, `src/main/java/com/clearfolio/viewer/controller/ConversionController.java` |
 | AC-06 | Standard error schema + trace in API responses | `IMPLEMENTED (submit/status/viewer)` | `ConversionController` exception mapping + `docs/diagrams/status-flow.md` + `docs/diagrams/preview-flow.md` |
 | AC-08 | NUL sanitization at persistence boundary | `IMPLEMENTED` | `src/main/java/com/clearfolio/viewer/model/ConversionJob.java`, `docs/diagrams/submit-flow.md` |
 

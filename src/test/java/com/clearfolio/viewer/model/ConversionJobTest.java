@@ -73,6 +73,47 @@ class ConversionJobTest {
     }
 
     @Test
+    void markProcessingRejectsWhenAttemptsAreExhausted() {
+        ConversionJob job = new ConversionJob(
+                UUID.randomUUID(),
+                "name.docx",
+                "application/pdf",
+                "hash-exhausted",
+                1L,
+                1
+        );
+
+        assertTrue(job.markProcessing("first"));
+        job.markRetryScheduled("retry immediately", Instant.now().minusMillis(1));
+
+        assertFalse(job.markProcessing("second"));
+        assertEquals(1, job.getAttemptCount());
+    }
+
+    @Test
+    void markRetryScheduledClearsStaleProcessingAndCompletionTimestamps() {
+        ConversionJob job = new ConversionJob(
+                UUID.randomUUID(),
+                "name.docx",
+                "application/pdf",
+                "hash-retry-reset",
+                1L,
+                3
+        );
+
+        assertTrue(job.markProcessing("first"));
+        assertNotNull(job.getStartedAt());
+        job.markFailed("first failed");
+        assertNotNull(job.getCompletedAt());
+
+        job.markRetryScheduled("retry soon", Instant.now().plusMillis(50));
+
+        assertNull(job.getStartedAt());
+        assertNull(job.getCompletedAt());
+        assertFalse(job.isDeadLettered());
+    }
+
+    @Test
     void transitionsAcrossRetryDeadLetterAndSuccessResetFlags() {
         ConversionJob job = new ConversionJob(
                 UUID.randomUUID(),

@@ -43,7 +43,7 @@ public class DefaultDocumentValidationService implements DocumentValidationServi
             throw new IllegalArgumentException("File extension is required.");
         }
 
-        if (blockedExtensions.contains(extension.toLowerCase(Locale.ROOT))) {
+        if (blockedExtensions.contains(extension)) {
             throw new UnsupportedDocumentFormatException(extension);
         }
 

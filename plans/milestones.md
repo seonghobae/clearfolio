@@ -1,7 +1,5 @@
 # 10-Week Milestones & Gates Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 Goal: Build Pattern B document conversion pipeline (Java backend + PDF.js + JODConverter + LibreOffice + final PDF render) with non-blocking queue/worker architecture, content-hash caching, audit logs, HWP/HWPX blocked by default (exceptions via isolated worker), and strict license policy (NO GPL/AGPL/LGPL).
 
 Architecture: Java (Spring Boot) backend exposing non-blocking submit endpoints; durable queue (RabbitMQ/Kafka) for conversion jobs; containerized conversion workers (JODConverter + LibreOffice) with a pre-warmed pool; object storage for immutable artifacts; PDF.js for final rendering in the browser; audit log store (append-only); content-hash cache (Redis or DB) to dedupe uploads.

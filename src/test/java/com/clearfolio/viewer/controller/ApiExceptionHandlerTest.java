@@ -193,6 +193,7 @@ class ApiExceptionHandlerTest {
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getHeader("X-Trace-Id")).thenReturn(headerTraceId);
         when(request.getRequestId()).thenReturn(requestId);
+        when(request.getRequestURI()).thenReturn("/test/path");
         return request;
     }
 }

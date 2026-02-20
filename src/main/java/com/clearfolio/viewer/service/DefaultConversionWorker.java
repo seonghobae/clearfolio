@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.clearfolio.viewer.model.ConversionJob;
+import com.clearfolio.viewer.model.ConversionJobStatus;
 import com.clearfolio.viewer.repository.ConversionJobRepository;
 
 /**
@@ -84,8 +85,7 @@ public class DefaultConversionWorker implements ConversionWorker {
         try {
             CompletableFuture.runAsync(() -> process(jobId), conversionExecutor);
         } catch (RejectedExecutionException ex) {
-            repository.findById(jobId)
-                    .ifPresent(job -> job.markDeadLettered("worker queue saturated"));
+            markDeadLetteredForQueueSaturation(jobId);
         }
     }
 
@@ -143,10 +143,24 @@ public class DefaultConversionWorker implements ConversionWorker {
             return;
         }
 
-        CompletableFuture.runAsync(
-                () -> process(jobId),
-                CompletableFuture.delayedExecutor(delayMs, TimeUnit.MILLISECONDS, conversionExecutor)
-        );
+        CompletableFuture.delayedExecutor(delayMs, TimeUnit.MILLISECONDS)
+                .execute(() -> {
+                    try {
+                        conversionExecutor.execute(() -> process(jobId));
+                    } catch (RejectedExecutionException ex) {
+                        markDeadLetteredForQueueSaturation(jobId);
+                    }
+                });
+    }
+
+    private void markDeadLetteredForQueueSaturation(UUID jobId) {
+        repository.findById(jobId)
+                .ifPresent(job -> {
+                    ConversionJobStatus status = job.getStatus();
+                    if (status == ConversionJobStatus.SUBMITTED || status == ConversionJobStatus.PROCESSING) {
+                        job.markDeadLettered("worker queue saturated");
+                    }
+                });
     }
 
     private String performDefaultConversion(UUID jobId) {

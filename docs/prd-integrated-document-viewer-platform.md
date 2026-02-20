@@ -32,7 +32,8 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 - `POST /api/v1/convert/jobs` submission endpoint.
 - `GET /api/v1/convert/jobs/{jobId}` status endpoint.
 - `GET /viewer/{docId}` and implemented aliases (`/api/v1/viewer/{docId}`, `/api/v1/convert/viewer/{docId}`).
-- Async worker path with states `SUBMITTED`, `PROCESSING`, `SUCCEEDED`, `FAILED`, `DEAD_LETTERED`.
+- Async worker path with states `SUBMITTED`, `PROCESSING`, `SUCCEEDED`, `FAILED`.
+- Retry-exhausted terminal failures are represented as `status=FAILED` with `deadLettered=true`.
 - HWP/HWPX block-by-default with approver-traceable exception lane.
 - Retry and DLQ design for failed background jobs.
 - Standard API error schema (`errorCode`, `message`, `traceId`, `details`) and request tracing.
@@ -47,7 +48,7 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 - `GET /viewer/{docId}` is canonical; aliases (`/api/v1/viewer/{docId}` and
   `/api/v1/convert/viewer/{docId}`) behave equivalently.
 - Terminal state HTTP semantics are preserved as
-  `409` for `SUBMITTED`/`PROCESSING`/`FAILED`/`DEAD_LETTERED` and `404` for missing.
+  `409` for `SUBMITTED`/`PROCESSING`/`FAILED` (including dead-lettered failures where `deadLettered=true`) and `404` for missing.
 - API compatibility retains both `errorCode` and compatibility `code` where already present.
 
 ### Viewer/Session Integration Baseline
@@ -95,7 +96,7 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 - FR-03: Ensure submission and status endpoints never run conversion logic inline.
 - FR-04: Persist immutable job metadata and transition states for every lifecycle event.
 - FR-05: Provide idempotent behavior for duplicate uploads through deterministic hash or equivalent dedupe signal.
-- FR-06: Return HTTP-appropriate states for viewer access: success with bootstrap info, conflict for in-progress/failed/dead-lettered, and 404 for missing.
+- FR-06: Return HTTP-appropriate states for viewer access: success with bootstrap info, conflict for in-progress/failed states (including retry-exhausted `deadLettered=true`), and 404 for missing.
 - FR-07: Record structured events for exception-driven formats, retries, and dead-lettered jobs.
 - FR-08: Provide clear retry policy config (attempts, interval, backoff, max age).
 - FR-09: Route read traffic to read-only DB endpoint when provided; otherwise safe default to primary.
@@ -137,11 +138,11 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 
 - AC-01 **IMPLEMENTED**: submit endpoint is async and returns `202` immediately.
   - Evidence: `src/main/java/com/clearfolio/viewer/controller/ConversionController.java`, `src/main/java/com/clearfolio/viewer/service/DefaultDocumentConversionService.java`.
-- AC-02 **IMPLEMENTED**: status lifecycle includes `SUBMITTED`, `PROCESSING`, `SUCCEEDED`, `FAILED`, `DEAD_LETTERED` with polling contract.
+- AC-02 **IMPLEMENTED**: status lifecycle includes `SUBMITTED`, `PROCESSING`, `SUCCEEDED`, `FAILED`, with retry-exhausted terminal state surfaced as `FAILED` + `deadLettered=true`.
   - Evidence: `src/main/java/com/clearfolio/viewer/model/ConversionJobStatus.java`, `docs/diagrams/status-flow.md`.
-- AC-03 **IMPLEMENTED**: `/viewer/{docId}` returns bootstrap on success and `409` for in-progress/failed/dead-lettered.
+- AC-03 **IMPLEMENTED**: `/viewer/{docId}` returns bootstrap on success and `409` for in-progress/failed states (including retry-exhausted `deadLettered=true`).
   - Evidence: `src/main/java/com/clearfolio/viewer/controller/ConversionController.java`, `src/main/java/com/clearfolio/viewer/api/ViewerBootstrapResponse.java`.
-  - Updated implementation-equivalent contract includes `FAILED` and `DEAD_LETTERED` as `409` terminal cases.
+  - Updated implementation-equivalent contract keeps terminal retries-exhausted cases in `FAILED` with `deadLettered=true`.
 - AC-04 **PARTIAL**: blocklist for HWP/HWPX is implemented; explicit exception lane is documented but not productionized.
   - Evidence: `src/main/java/com/clearfolio/viewer/service/DefaultDocumentValidationService.java`, `docs/diagrams/preview-flow.md`.
 - AC-05 **IMPLEMENTED**: NUL sanitization is applied at persistence edge for string fields.

@@ -23,7 +23,7 @@ public class InMemoryConversionJobRepository implements ConversionJobRepository 
     @Override
     public ConversionJob save(ConversionJob job) {
         jobs.put(job.getJobId(), job);
-        if (job.getContentHash() != null) {
+        if (job.getContentHash() != null && !job.getContentHash().isBlank()) {
             jobsByContentHash.putIfAbsent(job.getContentHash(), job.getJobId());
         }
         return job;

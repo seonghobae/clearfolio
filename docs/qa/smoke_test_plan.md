@@ -30,8 +30,9 @@
 6. 동일 요청에서 `SUBMITTED` → `PROCESSING` → `SUCCEEDED` 상태 전이가 관찰된다.
 7. NUL 바이트가 포함된 입력에서 5xx나 프로세스 다운이 발생하지 않는다.
 8. `GET /viewer/{docId}`(`/api/v1/viewer/{docId}`, `/api/v1/convert/viewer/{docId}`)에서
-   `SUCCEEDED`는 `200 + bootstrap payload`를, `SUBMITTED`/`PROCESSING`/`FAILED`/`DEAD_LETTERED`는
+   `SUCCEEDED`는 `200 + bootstrap payload`를, `SUBMITTED`/`PROCESSING`/`FAILED`는
    `409`를, 없는 `docId`는 `404`를 반환한다.
+   (재시도 소진 상태는 `status=FAILED` + `deadLettered=true`로 확인)
 9. 검증 명령 실행 시 warning/deprecated 출력이 0건이어야 한다.
 
 ## Go / No-Go 기준

@@ -53,7 +53,7 @@ public class ConversionProperties {
      * @param workerThreads worker thread count
      */
     public void setWorkerThreads(int workerThreads) {
-        this.workerThreads = workerThreads;
+        this.workerThreads = Math.max(1, workerThreads);
     }
 
     /**
@@ -71,7 +71,7 @@ public class ConversionProperties {
      * @param queueCapacity queue capacity
      */
     public void setQueueCapacity(int queueCapacity) {
-        this.queueCapacity = queueCapacity;
+        this.queueCapacity = Math.max(1, queueCapacity);
     }
 
     /**

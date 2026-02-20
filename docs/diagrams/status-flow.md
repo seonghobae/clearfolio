@@ -49,9 +49,7 @@ sequenceDiagram
     else status = FAILED
       Svc-->>Ctl: convert to ConversionJobStatusResponse
       Ctl-->>C: 200 FAILED with reason (retry metadata included: attemptCount/maxAttempts/retryAt/deadLettered)
-    else status = DEAD_LETTERED
-      Svc-->>Ctl: convert to ConversionJobStatusResponse
-      Ctl-->>C: 200 DEAD_LETTERED with reason (retry exhausted and terminal)
+      Note over Ctl,C: retry-exhausted terminal state remains FAILED and sets deadLettered=true
     end
 
   else job not found

@@ -4,5 +4,5 @@
     "http://checkstyle.org/dtds/suppressions_1_1.dtd">
 
 <suppressions>
-    <suppress checks="DesignForExtensionCheck|FinalParametersCheck|HiddenFieldCheck|HideUtilityClassConstructorCheck|JavadocPackageCheck|JavadocVariableCheck|LineLengthCheck|MagicNumberCheck|MissingJavadocMethodCheck|RegexpSinglelineCheck" files=".*[\\/]src[\\/](main|test)[\\/]java[\\/].*\.java"/>
+    <suppress checks="DesignForExtensionCheck|FinalParametersCheck|HiddenFieldCheck|HideUtilityClassConstructorCheck|JavadocPackageCheck|JavadocVariableCheck|LineLengthCheck|MagicNumberCheck|MissingJavadocMethodCheck|RegexpSinglelineCheck" files=".*[\\/]src[\\/]test[\\/]java[\\/].*\.java"/>
 </suppressions>

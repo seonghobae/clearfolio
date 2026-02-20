@@ -31,9 +31,14 @@ Target: customer-deliverable package within one business day
 ## Security verification commands
 
 ```bash
+# Set target repository and PR before running GitHub code scanning checks.
+REPO_OWNER="<owner>"
+REPO_NAME="<repo>"
+PR_NUMBER="<pr-number>"
+
 semgrep --config auto --error --json --output target/semgrep.json src/main/java
-gh api "/repos/HYOSUNG-ITX-AI-Business-Department/clearfolio-viewer/code-scanning/analyses?pr=1"
-gh api "/repos/HYOSUNG-ITX-AI-Business-Department/clearfolio-viewer/code-scanning/alerts?pr=1&state=open"
+gh api "/repos/${REPO_OWNER}/${REPO_NAME}/code-scanning/analyses?pr=${PR_NUMBER}"
+gh api "/repos/${REPO_OWNER}/${REPO_NAME}/code-scanning/alerts?pr=${PR_NUMBER}&state=open"
 ```
 
 ## Delivery evidence checklist

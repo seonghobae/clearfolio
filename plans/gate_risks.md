@@ -1,7 +1,5 @@
 # Gate Risks and Mitigations
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement mitigations and verification tasks.
-
 Top risks (minimum 5) and one-line mitigations:
 
 1) LibreOffice conversion instability (OOM, crashes) — Mitigation: Run LibreOffice in a pre-warmed, containerized pool with strict memory limits, health checks and automatic restart/circuit-breaker; include stress tests in Gate7.
