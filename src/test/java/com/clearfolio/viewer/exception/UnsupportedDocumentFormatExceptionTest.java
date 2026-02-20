@@ -1,6 +1,7 @@
 package com.clearfolio.viewer.exception;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +19,7 @@ class UnsupportedDocumentFormatExceptionTest {
     void usesGenericMessageWhenExtensionIsNull() {
         UnsupportedDocumentFormatException error = new UnsupportedDocumentFormatException(null);
 
-        assertEquals(null, error.getExtension());
+        assertNull(error.getExtension());
         assertEquals("This document type is blocked by policy.", error.getMessage());
     }
 

@@ -1,7 +1,6 @@
 package com.clearfolio.viewer.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -112,9 +111,7 @@ class ApiExceptionHandlerTest {
     @Test
     void handleMissingRequestPartIncludesPartName() {
         HttpServletRequest request = request("trace-4", "request-4");
-        MissingServletRequestPartException error = assertDoesNotThrow(
-                () -> new MissingServletRequestPartException("file")
-        );
+        MissingServletRequestPartException error = new MissingServletRequestPartException("file");
 
         ResponseEntity<ApiErrorResponse> response = handler.handleMissingServletRequestPart(
                 error,
