@@ -189,6 +189,26 @@ class ApiExceptionHandlerTest {
         assertFalse(body.traceId().isBlank());
     }
 
+    @Test
+    void handleUnexpectedSupportsNullRequestUri() {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getHeader("X-Trace-Id")).thenReturn(null);
+        when(request.getRequestId()).thenReturn(null);
+        when(request.getRequestURI()).thenReturn(null);
+
+        ResponseEntity<ApiErrorResponse> response = handler.handleUnexpected(
+                new RuntimeException("boom"),
+                request
+        );
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        ApiErrorResponse body = response.getBody();
+        assertNotNull(body);
+        assertEquals("INTERNAL_ERROR", body.errorCode());
+        assertNotNull(body.traceId());
+        assertFalse(body.traceId().isBlank());
+    }
+
     private HttpServletRequest request(String headerTraceId, String requestId) {
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getHeader("X-Trace-Id")).thenReturn(headerTraceId);

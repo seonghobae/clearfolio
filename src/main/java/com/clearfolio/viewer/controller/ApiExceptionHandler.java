@@ -163,7 +163,12 @@ public class ApiExceptionHandler {
             Exception ex,
             HttpServletRequest request) {
         String traceId = resolveTraceId(request);
-        LOGGER.error("Unexpected error on path={} traceId={}", request.getRequestURI(), traceId, ex);
+        LOGGER.error(
+                "Unexpected error on path={} traceId={}",
+                sanitizeForLog(request.getRequestURI()),
+                sanitizeForLog(traceId),
+                ex
+        );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ApiErrorResponse(
                         "INTERNAL_ERROR",
@@ -195,5 +200,12 @@ public class ApiExceptionHandler {
         }
         return value.substring(separatorIndex + 1);
 
+    }
+
+    private String sanitizeForLog(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace('\r', '_').replace('\n', '_');
     }
 }
