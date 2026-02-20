@@ -505,6 +505,145 @@ class DefaultConversionWorkerTest {
     }
 
     @Test
+    void workerMarksJobFailedWhenConversionThrowsNonRuntimeError() {
+        ConversionJobRepository repository = new InMemoryConversionJobRepository();
+        ConversionProperties conversionProperties = new ConversionProperties();
+        conversionProperties.setMaxRetryAttempts(1);
+
+        UUID jobId = UUID.randomUUID();
+        ConversionJob job = new ConversionJob(
+                jobId,
+                "report.docx",
+                "application/octet-stream",
+                "hash-error",
+                10L,
+                1
+        );
+        repository.save(job);
+
+        DefaultConversionWorker worker = new DefaultConversionWorker(
+                repository,
+                Runnable::run,
+                conversionProperties,
+                id -> {
+                    throw new AssertionError("boom-error");
+                }
+        );
+
+        worker.enqueue(jobId);
+
+        assertEquals(ConversionJobStatus.FAILED, job.getStatus());
+        assertTrue(job.isDeadLettered());
+        assertEquals("conversion failed: boom-error", job.getStatusMessage());
+    }
+
+    @Test
+    void workerUsesErrorTypeWhenFailureMessageIsNull() {
+        ConversionJobRepository repository = new InMemoryConversionJobRepository();
+        ConversionProperties conversionProperties = new ConversionProperties();
+        conversionProperties.setMaxRetryAttempts(1);
+
+        UUID jobId = UUID.randomUUID();
+        ConversionJob job = new ConversionJob(
+                jobId,
+                "report.docx",
+                "application/octet-stream",
+                "hash-null-error",
+                10L,
+                1
+        );
+        repository.save(job);
+
+        DefaultConversionWorker worker = new DefaultConversionWorker(
+                repository,
+                Runnable::run,
+                conversionProperties,
+                id -> {
+                    throw new AssertionError();
+                }
+        );
+
+        worker.enqueue(jobId);
+
+        assertEquals(ConversionJobStatus.FAILED, job.getStatus());
+        assertTrue(job.isDeadLettered());
+        assertEquals("conversion failed: AssertionError", job.getStatusMessage());
+    }
+
+    @Test
+    void workerUsesErrorTypeWhenFailureMessageIsBlank() {
+        ConversionJobRepository repository = new InMemoryConversionJobRepository();
+        ConversionProperties conversionProperties = new ConversionProperties();
+        conversionProperties.setMaxRetryAttempts(1);
+
+        UUID jobId = UUID.randomUUID();
+        ConversionJob job = new ConversionJob(
+                jobId,
+                "report.docx",
+                "application/octet-stream",
+                "hash-blank-error",
+                10L,
+                1
+        );
+        repository.save(job);
+
+        DefaultConversionWorker worker = new DefaultConversionWorker(
+                repository,
+                Runnable::run,
+                conversionProperties,
+                id -> {
+                    throw new AssertionError("   ");
+                }
+        );
+
+        worker.enqueue(jobId);
+
+        assertEquals(ConversionJobStatus.FAILED, job.getStatus());
+        assertTrue(job.isDeadLettered());
+        assertEquals("conversion failed: AssertionError", job.getStatusMessage());
+    }
+
+    @Test
+    void workerRethrowsVirtualMachineErrorAfterUpdatingFailureState() {
+        ConversionJobRepository repository = new InMemoryConversionJobRepository();
+        ConversionProperties conversionProperties = new ConversionProperties();
+        conversionProperties.setMaxRetryAttempts(1);
+
+        UUID jobId = UUID.randomUUID();
+        ConversionJob job = new ConversionJob(
+                jobId,
+                "report.docx",
+                "application/octet-stream",
+                "hash-vme",
+                10L,
+                1
+        );
+        repository.save(job);
+
+        class TestVirtualMachineError extends VirtualMachineError {
+            private static final long serialVersionUID = 1L;
+
+            TestVirtualMachineError(String message) {
+                super(message);
+            }
+        }
+
+        DefaultConversionWorker worker = new DefaultConversionWorker(
+                repository,
+                Runnable::run,
+                conversionProperties,
+                id -> {
+                    throw new TestVirtualMachineError("vm-boom");
+                }
+        );
+
+        assertThrows(TestVirtualMachineError.class, () -> invokeProcess(worker, jobId));
+        assertEquals(ConversionJobStatus.FAILED, job.getStatus());
+        assertTrue(job.isDeadLettered());
+        assertEquals("conversion failed: vm-boom", job.getStatusMessage());
+    }
+
+    @Test
     void performDefaultConversionThrowsWhenThreadIsInterrupted() {
         ConversionJobRepository repository = new InMemoryConversionJobRepository();
         DefaultConversionWorker worker = new DefaultConversionWorker(
@@ -559,6 +698,25 @@ class DefaultConversionWorkerTest {
             Throwable cause = ex.getCause();
             if (cause instanceof RuntimeException runtimeException) {
                 throw runtimeException;
+            }
+            throw new RuntimeException(cause);
+        } catch (ReflectiveOperationException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    private void invokeProcess(DefaultConversionWorker worker, UUID jobId) {
+        try {
+            Method method = DefaultConversionWorker.class.getDeclaredMethod("process", UUID.class);
+            method.setAccessible(true);
+            method.invoke(worker, jobId);
+        } catch (InvocationTargetException ex) {
+            Throwable cause = ex.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (cause instanceof Error error) {
+                throw error;
             }
             throw new RuntimeException(cause);
         } catch (ReflectiveOperationException ex) {

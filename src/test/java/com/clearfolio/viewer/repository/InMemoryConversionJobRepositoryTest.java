@@ -53,10 +53,22 @@ class InMemoryConversionJobRepositoryTest {
         ConversionJob second = newJob("hash-c");
         repository.save(first);
 
-        ConversionJob winner = repository.findOrStoreByContentHash(second);
+        ConversionJobRepository.FindOrStoreResult result = repository.findOrStoreByContentHash(second);
 
-        assertSame(first, winner);
+        assertSame(first, result.canonicalJob());
+        assertFalse(result.created());
         assertFalse(repository.findById(second.getJobId()).isPresent());
+    }
+
+    @Test
+    void findOrStoreMarksCreatedWhenHashIsStoredFirstTime() {
+        InMemoryConversionJobRepository repository = new InMemoryConversionJobRepository();
+        ConversionJob candidate = newJob("hash-created");
+
+        ConversionJobRepository.FindOrStoreResult result = repository.findOrStoreByContentHash(candidate);
+
+        assertSame(candidate, result.canonicalJob());
+        assertTrue(result.created());
     }
 
     @Test
@@ -68,9 +80,10 @@ class InMemoryConversionJobRepositoryTest {
 
         ConversionJob candidate = newJob("hash-d");
 
-        ConversionJob winner = repository.findOrStoreByContentHash(candidate);
+        ConversionJobRepository.FindOrStoreResult result = repository.findOrStoreByContentHash(candidate);
 
-        assertSame(candidate, winner);
+        assertSame(candidate, result.canonicalJob());
+        assertTrue(result.created());
         assertEquals(candidate.getJobId(), jobsByContentHash(repository).get("hash-d"));
         assertTrue(repository.findById(candidate.getJobId()).isPresent());
     }
@@ -80,9 +93,10 @@ class InMemoryConversionJobRepositoryTest {
         InMemoryConversionJobRepository repository = new InMemoryConversionJobRepository();
         ConversionJob candidate = newJob(" ");
 
-        ConversionJob stored = repository.findOrStoreByContentHash(candidate);
+        ConversionJobRepository.FindOrStoreResult result = repository.findOrStoreByContentHash(candidate);
 
-        assertSame(candidate, stored);
+        assertSame(candidate, result.canonicalJob());
+        assertTrue(result.created());
         assertTrue(repository.findById(candidate.getJobId()).isPresent());
     }
 
@@ -113,9 +127,10 @@ class InMemoryConversionJobRepositoryTest {
         InMemoryConversionJobRepository repository = new InMemoryConversionJobRepository();
         ConversionJob candidate = newJob(null);
 
-        ConversionJob stored = repository.findOrStoreByContentHash(candidate);
+        ConversionJobRepository.FindOrStoreResult result = repository.findOrStoreByContentHash(candidate);
 
-        assertSame(candidate, stored);
+        assertSame(candidate, result.canonicalJob());
+        assertTrue(result.created());
         assertTrue(repository.findById(candidate.getJobId()).isPresent());
         assertTrue(jobsByContentHash(repository).isEmpty());
     }

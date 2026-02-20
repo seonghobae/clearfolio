@@ -16,6 +16,7 @@ import java.security.Security;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -133,6 +134,71 @@ class DefaultDocumentConversionServiceTest {
     }
 
     @Test
+    void submitEnqueuesWhenRepositoryReportsCreatedWithDifferentCanonicalJobId() {
+        RecordingConversionWorker worker = new RecordingConversionWorker();
+        UUID canonicalId = UUID.randomUUID();
+        ConversionJob canonical = new ConversionJob(
+                canonicalId,
+                "canonical.docx",
+                "application/octet-stream",
+                "canonical-hash",
+                10L,
+                3
+        );
+        ConversionJobRepository repository = new FindOrStoreOnlyRepository(
+                candidate -> new ConversionJobRepository.FindOrStoreResult(canonical, true)
+        );
+
+        DocumentConversionService service = new DefaultDocumentConversionService(
+                repository,
+                file -> {
+                },
+                worker,
+                new ConversionProperties()
+        );
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "contract.docx",
+                "application/octet-stream",
+                "hello-viewer".getBytes()
+        );
+
+        UUID submitted = service.submit(file);
+
+        assertEquals(canonicalId, submitted);
+        assertEquals(1, worker.enqueuedCount());
+    }
+
+    @Test
+    void submitSkipsEnqueueWhenRepositoryReportsExistingEvenForCandidateCanonical() {
+        RecordingConversionWorker worker = new RecordingConversionWorker();
+        ConversionJobRepository repository = new FindOrStoreOnlyRepository(
+                candidate -> new ConversionJobRepository.FindOrStoreResult(candidate, false)
+        );
+
+        DocumentConversionService service = new DefaultDocumentConversionService(
+                repository,
+                file -> {
+                },
+                worker,
+                new ConversionProperties()
+        );
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "contract.docx",
+                "application/octet-stream",
+                "hello-viewer".getBytes()
+        );
+
+        UUID submitted = service.submit(file);
+
+        assertEquals(0, worker.enqueuedCount());
+        assertNotEquals(new UUID(0L, 0L), submitted);
+    }
+
+    @Test
     void getJobReturnsRepositoryEntry() {
         ConversionJobRepository repository = new InMemoryConversionJobRepository();
         RecordingConversionWorker worker = new RecordingConversionWorker();
@@ -224,6 +290,34 @@ class DefaultDocumentConversionServiceTest {
 
         int enqueuedCount() {
             return count.get();
+        }
+    }
+
+    private static class FindOrStoreOnlyRepository implements ConversionJobRepository {
+        private final java.util.function.Function<ConversionJob, ConversionJobRepository.FindOrStoreResult> finder;
+
+        FindOrStoreOnlyRepository(java.util.function.Function<ConversionJob, ConversionJobRepository.FindOrStoreResult> finder) {
+            this.finder = finder;
+        }
+
+        @Override
+        public ConversionJob save(ConversionJob job) {
+            throw new UnsupportedOperationException("not used");
+        }
+
+        @Override
+        public Optional<ConversionJob> findById(UUID jobId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<ConversionJob> findByContentHash(String contentHash) {
+            return Optional.empty();
+        }
+
+        @Override
+        public ConversionJobRepository.FindOrStoreResult findOrStoreByContentHash(ConversionJob candidate) {
+            return finder.apply(candidate);
         }
     }
 }

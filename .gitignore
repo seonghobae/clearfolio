@@ -7,3 +7,21 @@ target/
 .settings/
 *.log
 evidence/
+
+# Local env and secret material
+.env
+.env.*
+*.env
+*.local
+*.secret
+secrets/
+
+# Certificates and keys
+certs/
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+*.jks

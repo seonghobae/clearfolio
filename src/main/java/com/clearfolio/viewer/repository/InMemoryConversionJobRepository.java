@@ -3,6 +3,8 @@ package com.clearfolio.viewer.repository;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.springframework.stereotype.Repository;
 
@@ -33,29 +35,34 @@ public class InMemoryConversionJobRepository implements ConversionJobRepository 
      * {@inheritDoc}
      */
     @Override
-    public ConversionJob findOrStoreByContentHash(ConversionJob candidate) {
+    public ConversionJobRepository.FindOrStoreResult findOrStoreByContentHash(ConversionJob candidate) {
         String contentHash = candidate.getContentHash();
         if (contentHash == null || contentHash.isBlank()) {
             save(candidate);
-            return candidate;
+            return new ConversionJobRepository.FindOrStoreResult(candidate, true);
         }
 
-        UUID winnerJobId = jobsByContentHash.computeIfAbsent(
+        AtomicBoolean created = new AtomicBoolean(false);
+        AtomicReference<ConversionJob> canonical = new AtomicReference<>();
+        jobsByContentHash.compute(
                 contentHash,
-                key -> {
+                (key, existingJobId) -> {
+                    if (existingJobId != null) {
+                        ConversionJob existing = jobs.get(existingJobId);
+                        if (existing != null) {
+                            canonical.set(existing);
+                            return existingJobId;
+                        }
+                    }
+
                     jobs.put(candidate.getJobId(), candidate);
+                    created.set(true);
+                    canonical.set(candidate);
                     return candidate.getJobId();
                 }
         );
 
-        ConversionJob winner = jobs.get(winnerJobId);
-        if (winner == null) {
-            jobs.put(candidate.getJobId(), candidate);
-            jobsByContentHash.put(contentHash, candidate.getJobId());
-            return candidate;
-        }
-
-        return winner;
+        return new ConversionJobRepository.FindOrStoreResult(canonical.get(), created.get());
     }
 
     /**

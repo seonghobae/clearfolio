@@ -107,10 +107,21 @@ public class DefaultConversionWorker implements ConversionWorker {
             try {
                 String convertedResourcePath = conversionTask.apply(jobId);
                 job.markSucceeded(convertedResourcePath, "conversion completed");
-            } catch (RuntimeException ex) {
-                onFailure(job, "conversion failed: " + ex.getMessage());
+            } catch (Throwable ex) {
+                onFailure(job, failureReason(ex));
+                if (ex instanceof VirtualMachineError error) {
+                    throw error;
+                }
             }
         });
+    }
+
+    private String failureReason(Throwable error) {
+        String message = error.getMessage();
+        if (message == null || message.isBlank()) {
+            return "conversion failed: " + error.getClass().getSimpleName();
+        }
+        return "conversion failed: " + message;
     }
 
     private void onFailure(ConversionJob job, String reason) {

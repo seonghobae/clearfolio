@@ -48,9 +48,9 @@ mvn test
 # warning/deprecated fail-fast gate
 mvn -q -DskipTests compile
 
+mkdir -p logs test-results
 mvn spring-boot:run > logs/app.stdout.log 2>&1 &
 APP_PID=$!
-mkdir -p logs test-results
 
 sleep 4
 curl -sS --max-time 5 http://localhost:8080/healthz | jq .

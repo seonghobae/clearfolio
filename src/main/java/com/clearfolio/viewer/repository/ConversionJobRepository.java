@@ -11,6 +11,15 @@ import com.clearfolio.viewer.model.ConversionJob;
 public interface ConversionJobRepository {
 
     /**
+     * Result of an atomic find-or-store operation by content hash.
+     *
+     * @param canonicalJob canonical stored conversion job
+     * @param created true when the candidate was newly stored
+     */
+    record FindOrStoreResult(ConversionJob canonicalJob, boolean created) {
+    }
+
+    /**
      * Saves a conversion job.
      *
      * @param job conversion job to store
@@ -38,7 +47,7 @@ public interface ConversionJobRepository {
      * Stores a new job or returns the existing canonical job for the same hash.
      *
      * @param candidate candidate conversion job
-     * @return canonical stored conversion job
+     * @return canonical stored conversion job and whether the candidate was created
      */
-    ConversionJob findOrStoreByContentHash(ConversionJob candidate);
+    FindOrStoreResult findOrStoreByContentHash(ConversionJob candidate);
 }

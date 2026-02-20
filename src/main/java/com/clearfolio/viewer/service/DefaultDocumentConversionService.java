@@ -63,12 +63,12 @@ public class DefaultDocumentConversionService implements DocumentConversionServi
                 maxRetryAttempts
         );
 
-        ConversionJob canonical = repository.findOrStoreByContentHash(job);
-        if (canonical.getJobId().equals(job.getJobId())) {
-            conversionWorker.enqueue(job.getJobId());
+        ConversionJobRepository.FindOrStoreResult result = repository.findOrStoreByContentHash(job);
+        if (result.created()) {
+            conversionWorker.enqueue(result.canonicalJob().getJobId());
         }
 
-        return canonical.getJobId();
+        return result.canonicalJob().getJobId();
     }
 
     /**
