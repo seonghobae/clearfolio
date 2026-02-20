@@ -75,8 +75,8 @@ This repository currently ships a MVP scaffold, not a production-grade Pattern B
 
 1. Add persistent job store (PostgreSQL).
 2. Replace in-memory repository with durable queue + worker pool.
-3. Add retry policy, DLQ, and audit event emission.
-4. Add content-hash based dedupe cache layer.
+3. Harden retry policy, DLQ handling, and audit event emission for production operations.
+4. Expand content-hash dedupe into multi-instance cache coordination.
 5. Complete preview orchestration path and S2S session handling for `/viewer/{docId}`.
 
 ## Runtime Configuration

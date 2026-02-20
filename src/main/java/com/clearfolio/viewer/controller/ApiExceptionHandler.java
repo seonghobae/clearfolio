@@ -142,10 +142,14 @@ public class ApiExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleResponseStatus(
             ResponseStatusException ex,
             HttpServletRequest request) {
+        String reason = ex.getReason();
+        if (reason == null || reason.isBlank()) {
+            reason = "HTTP " + ex.getStatusCode().value();
+        }
         return ResponseEntity.status(ex.getStatusCode())
                 .body(new ApiErrorResponse(
                         normalizeStatusCode(ex.getStatusCode()),
-                        ex.getReason(),
+                        reason,
                         resolveTraceId(request),
                         Map.of()
                 ));
@@ -206,6 +210,9 @@ public class ApiExceptionHandler {
         if (value == null) {
             return "";
         }
-        return value.replace('\r', '_').replace('\n', '_');
+        return value
+                .replace('\u0000', '_')
+                .replace('\r', '_')
+                .replace('\n', '_');
     }
 }

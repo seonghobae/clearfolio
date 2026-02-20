@@ -249,13 +249,14 @@ public class ConversionJob {
             return false;
         }
 
-        if (retryAt != null && retryAt.isAfter(Instant.now())) {
+        Instant now = Instant.now();
+        if (retryAt != null && retryAt.isAfter(now)) {
             return false;
         }
 
         this.status = ConversionJobStatus.PROCESSING;
         this.attemptCount++;
-        this.startedAt = Instant.now();
+        this.startedAt = now;
         this.completedAt = null;
         this.retryAt = null;
         this.deadLettered = false;

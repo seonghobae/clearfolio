@@ -154,6 +154,38 @@ class ApiExceptionHandlerTest {
     }
 
     @Test
+    void handleResponseStatusUsesDefaultMessageWhenReasonMissing() {
+        HttpServletRequest request = request("trace-null-reason", "request-null-reason");
+
+        ResponseEntity<ApiErrorResponse> response = handler.handleResponseStatus(
+                new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE),
+                request
+        );
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
+        ApiErrorResponse body = response.getBody();
+        assertNotNull(body);
+        assertEquals("SERVICE_UNAVAILABLE", body.errorCode());
+        assertEquals("HTTP 503", body.message());
+    }
+
+    @Test
+    void handleResponseStatusUsesDefaultMessageWhenReasonIsBlank() {
+        HttpServletRequest request = request("trace-blank-reason", "request-blank-reason");
+
+        ResponseEntity<ApiErrorResponse> response = handler.handleResponseStatus(
+                new ResponseStatusException(HttpStatus.BAD_REQUEST, " "),
+                request
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        ApiErrorResponse body = response.getBody();
+        assertNotNull(body);
+        assertEquals("BAD_REQUEST", body.errorCode());
+        assertEquals("HTTP 400", body.message());
+    }
+
+    @Test
     void handleUnexpectedReturnsInternalErrorPayload() {
         HttpServletRequest request = request("trace-7", "request-7");
 
