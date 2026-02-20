@@ -5,6 +5,8 @@ package com.clearfolio.viewer.exception;
  */
 public class UnsupportedDocumentFormatException extends IllegalArgumentException {
 
+    private static final long serialVersionUID = 1L;
+
     private final String extension;
 
     /**

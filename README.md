@@ -26,8 +26,14 @@ an asynchronous conversion simulation for early pattern validation.
 ## Acceptance gates (current)
 
 - Mandatory: test coverage 100%, docstring 100%, non-blocking request path,
-  lightweight event queue, warning count 0, deprecated usage 0.
+  lightweight event queue, warning count 0, deprecated usage 0,
+  and one-day delivery schedule with security verification evidence.
 - Optional: DB pooler client path (when DB is introduced), PostgreSQL 17 support track.
+
+## Delivery schedule
+
+- One-day customer delivery plan (including security verification):
+  - `docs/plans/2026-02-20-24h-customer-delivery-plan.md`
 
 ## Documentation references
 

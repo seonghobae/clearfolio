@@ -79,11 +79,18 @@ This TRD captures the technical scope that is implemented in this repository tod
 - **Lightweight queue gate:** bounded async executor, retry scheduling, dead-letter terminal path.
 - **Warning gate:** compiler/test verification outputs must be warning-free.
 - **Deprecated gate:** deprecated API usage count must be zero in build verification.
+- **One-day delivery gate:** 24-hour customer-delivery schedule exists and includes mandatory security verification checkpoint completion.
 
 ## 6-2) Optional acceptance tracks
 
 - **Client DB pooler:** optional PgBouncer/PgCat detection and read-only routing (only when DB is introduced).
 - **PostgreSQL 17:** optional compatibility track with integration verification before enablement.
+
+## 6-3) One-day customer delivery schedule
+
+- The release can be executed in one business day by following:
+  - `docs/plans/2026-02-20-24h-customer-delivery-plan.md`.
+- This schedule includes required security checks (SAST + dependency + API-gate evidence) before customer handoff.
 
 ## 7) Risk acceptance and validation alignment
 

@@ -131,6 +131,7 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 - AC-12: Lightweight event queue is bounded, retry-capable, and dead-letter aware under failure conditions.
 - AC-13: Warning count is 0 in verification command outputs.
 - AC-14: Deprecated API usage count is 0 in verification command outputs.
+- AC-15: A one-day (<=24h) customer-delivery schedule is documented and executed with mandatory security verification evidence.
 
 ### Acceptance Mapping (Current Implementation)
 
@@ -162,6 +163,8 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
   - Evidence: `pom.xml` (`maven-compiler-plugin`, `maven-surefire-plugin`).
 - AC-14 **IMPLEMENTED**: build is configured to fail on deprecated usage warnings.
   - Evidence: `pom.xml` (`-Xlint:all`, `-Werror`).
+- AC-15 **IMPLEMENTED (planning+evidence)**: 24-hour delivery schedule and security verification checkpoints are documented for immediate customer-ready handoff.
+  - Evidence: `docs/plans/2026-02-20-24h-customer-delivery-plan.md`, `docs/qa/acceptance_evidence_checklist.md`.
 
 ## 10. Release Plan
 
@@ -169,6 +172,11 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 - **Week 3-5:** Queue/worker hardening, retries, DLQ, and status/state contracts complete.
 - **Week 6-8:** Viewer bootstrap integration, security/audit instrumentation, exception flow implementation, and mobile shell baseline.
 - **Week 9-10:** Dockerized smoke run, NFR compliance checks, docs/sign-off, and go-live criteria.
+
+### Fast-track customer delivery (<=24h)
+
+- For urgent customer delivery, use the one-day execution schedule with mandatory security checks:
+  - `docs/plans/2026-02-20-24h-customer-delivery-plan.md`.
 
 ## Decisions / Assumptions / Risks
 

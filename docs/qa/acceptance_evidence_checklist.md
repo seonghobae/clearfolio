@@ -45,6 +45,16 @@ This checklist captures mandatory/optional acceptance evidence for current MVP r
    - Gate:
      - Deprecated usage treated as warning and blocked by `-Werror`.
 
+7. One-day delivery schedule + security verification
+   - Schedule artifact:
+     - `docs/plans/2026-02-20-24h-customer-delivery-plan.md`
+   - Security verification commands:
+     - `semgrep --config auto --error --json --output target/semgrep.json src/main/java`
+     - `gh api "/repos/HYOSUNG-ITX-AI-Business-Department/clearfolio-viewer/code-scanning/analyses?pr=1"`
+     - `gh api "/repos/HYOSUNG-ITX-AI-Business-Department/clearfolio-viewer/code-scanning/alerts?pr=1&state=open"`
+   - Gate:
+     - Security command outputs are recorded and attached to PR evidence comment before delivery decision.
+
 ## Optional tracks
 
 1. Client DB pooler (when DB path is enabled)

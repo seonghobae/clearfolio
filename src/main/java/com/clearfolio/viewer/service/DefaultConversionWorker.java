@@ -131,7 +131,7 @@ public class DefaultConversionWorker implements ConversionWorker {
         }
 
         double power = Math.pow(retryBackoffMultiplier, Math.max(0, attemptCount - 1));
-        long exponential = (long) Math.round(retryInitialDelayMs * power);
+        long exponential = Math.round(retryInitialDelayMs * power);
         long bounded = Math.max(retryInitialDelayMs, exponential);
         return Math.min(bounded, retryMaxDelayMs);
     }
