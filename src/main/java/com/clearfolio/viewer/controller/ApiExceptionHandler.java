@@ -198,13 +198,12 @@ public class ApiExceptionHandler {
     }
 
     private String normalizeStatusCode(HttpStatusCode statusCode) {
-        String value = statusCode.toString();
-        int separatorIndex = value.indexOf(' ');
-        if (separatorIndex < 0) {
-            return value;
+        int code = statusCode.value();
+        HttpStatus resolved = HttpStatus.resolve(code);
+        if (resolved == null) {
+            return Integer.toString(code);
         }
-        return value.substring(separatorIndex + 1);
-
+        return resolved.name();
     }
 
     private String sanitizeForLog(String value) {

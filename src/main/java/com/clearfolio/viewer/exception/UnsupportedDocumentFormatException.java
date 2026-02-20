@@ -20,10 +20,11 @@ public class UnsupportedDocumentFormatException extends IllegalArgumentException
     }
 
     private static String buildMessage(String extension) {
+        String suffix = "This document type is blocked by policy.";
         if (extension == null || extension.isBlank()) {
-            return "Unsupported format. hwp/hwpx documents are blocked by default.";
+            return suffix;
         }
-        return "Unsupported format: " + extension + ". hwp/hwpx documents are blocked by default.";
+        return "Unsupported format: " + extension + ". " + suffix;
     }
 
     /**

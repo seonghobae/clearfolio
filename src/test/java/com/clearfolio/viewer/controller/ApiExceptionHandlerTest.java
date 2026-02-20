@@ -60,7 +60,7 @@ class ApiExceptionHandlerTest {
         ApiErrorResponse body = response.getBody();
         assertNotNull(body);
         assertEquals("UNSUPPORTED_FORMAT", body.errorCode());
-        assertEquals("Unsupported format. hwp/hwpx documents are blocked by default.", body.message());
+        assertEquals("This document type is blocked by policy.", body.message());
         assertTrue(body.details().isEmpty());
     }
 

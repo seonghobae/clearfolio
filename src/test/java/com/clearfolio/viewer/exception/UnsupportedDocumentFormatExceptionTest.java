@@ -11,7 +11,7 @@ class UnsupportedDocumentFormatExceptionTest {
         UnsupportedDocumentFormatException error = new UnsupportedDocumentFormatException("hwpx");
 
         assertEquals("hwpx", error.getExtension());
-        assertEquals("Unsupported format: hwpx. hwp/hwpx documents are blocked by default.", error.getMessage());
+        assertEquals("Unsupported format: hwpx. This document type is blocked by policy.", error.getMessage());
     }
 
     @Test
@@ -19,7 +19,7 @@ class UnsupportedDocumentFormatExceptionTest {
         UnsupportedDocumentFormatException error = new UnsupportedDocumentFormatException(null);
 
         assertEquals(null, error.getExtension());
-        assertEquals("Unsupported format. hwp/hwpx documents are blocked by default.", error.getMessage());
+        assertEquals("This document type is blocked by policy.", error.getMessage());
     }
 
     @Test
@@ -27,6 +27,6 @@ class UnsupportedDocumentFormatExceptionTest {
         UnsupportedDocumentFormatException error = new UnsupportedDocumentFormatException(" ");
 
         assertEquals(" ", error.getExtension());
-        assertEquals("Unsupported format. hwp/hwpx documents are blocked by default.", error.getMessage());
+        assertEquals("This document type is blocked by policy.", error.getMessage());
     }
 }
