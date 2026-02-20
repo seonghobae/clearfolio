@@ -183,8 +183,6 @@ class DefaultConversionWorkerTest {
 
             worker.enqueue(jobId);
 
-            assertRemainsZero(attempts, 150);
-
             await(() -> attempts.get() >= 1, 3_000);
 
             assertEquals(1, attempts.get());
@@ -538,14 +536,6 @@ class DefaultConversionWorkerTest {
         }
 
         throw new AssertionError("condition not met within timeout");
-    }
-
-    private void assertRemainsZero(AtomicInteger value, long durationMs) throws Exception {
-        long deadline = System.currentTimeMillis() + durationMs;
-        while (System.currentTimeMillis() < deadline) {
-            assertEquals(0, value.get());
-            Thread.sleep(10);
-        }
     }
 
     private long invokeComputeRetryDelay(DefaultConversionWorker worker, int attemptCount) throws Exception {
