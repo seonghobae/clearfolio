@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Method;
 import java.util.UUID;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -43,6 +44,33 @@ class ApiExceptionHandlerTest {
         assertTrue(body.message().contains("hwp"));
         assertEquals("trace-header", body.traceId());
         assertEquals("hwp", body.details().get("extension"));
+    }
+
+    @Test
+    void handleUnsupportedOmitsExtensionDetailWhenExtensionIsNull() {
+        HttpServletRequest request = request("trace-header-null-ext", "request-null-ext");
+
+        ResponseEntity<ApiErrorResponse> response = handler.handleUnsupported(
+                new UnsupportedDocumentFormatException(null),
+                request
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        ApiErrorResponse body = response.getBody();
+        assertNotNull(body);
+        assertEquals("UNSUPPORTED_FORMAT", body.errorCode());
+        assertEquals("Unsupported format. hwp/hwpx documents are blocked by default.", body.message());
+        assertTrue(body.details().isEmpty());
+    }
+
+    @Test
+    void sanitizeForLogReplacesControlCharacters() throws Exception {
+        Method method = ApiExceptionHandler.class.getDeclaredMethod("sanitizeForLog", String.class);
+        method.setAccessible(true);
+
+        String sanitized = (String) method.invoke(handler, "a\u0000b\rc\nd\u2028e\u2029f\u202Eg");
+
+        assertEquals("a_b_c_d_e_f_g", sanitized);
     }
 
     @Test

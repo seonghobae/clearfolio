@@ -1,6 +1,7 @@
 package com.clearfolio.viewer.controller;
 
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.UUID;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,7 +45,7 @@ public class ApiExceptionHandler {
                         "UNSUPPORTED_FORMAT",
                         ex.getMessage(),
                         resolveTraceId(request),
-                        Map.of("extension", ex.getExtension())
+                        extensionDetails(ex.getExtension())
                 ));
     }
 
@@ -213,6 +214,22 @@ public class ApiExceptionHandler {
         return value
                 .replace('\u0000', '_')
                 .replace('\r', '_')
-                .replace('\n', '_');
+                .replace('\n', '_')
+                .replace('\u2028', '_')
+                .replace('\u2029', '_')
+                .replace('\u202A', '_')
+                .replace('\u202B', '_')
+                .replace('\u202C', '_')
+                .replace('\u202D', '_')
+                .replace('\u202E', '_');
+    }
+
+    private Map<String, Object> extensionDetails(String extension) {
+        if (extension == null) {
+            return Map.of();
+        }
+        LinkedHashMap<String, Object> details = new LinkedHashMap<>();
+        details.put("extension", extension);
+        return details;
     }
 }

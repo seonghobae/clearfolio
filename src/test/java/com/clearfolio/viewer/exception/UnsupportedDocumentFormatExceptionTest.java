@@ -13,4 +13,20 @@ class UnsupportedDocumentFormatExceptionTest {
         assertEquals("hwpx", error.getExtension());
         assertEquals("Unsupported format: hwpx. hwp/hwpx documents are blocked by default.", error.getMessage());
     }
+
+    @Test
+    void usesGenericMessageWhenExtensionIsNull() {
+        UnsupportedDocumentFormatException error = new UnsupportedDocumentFormatException(null);
+
+        assertEquals(null, error.getExtension());
+        assertEquals("Unsupported format. hwp/hwpx documents are blocked by default.", error.getMessage());
+    }
+
+    @Test
+    void usesGenericMessageWhenExtensionIsBlank() {
+        UnsupportedDocumentFormatException error = new UnsupportedDocumentFormatException(" ");
+
+        assertEquals(" ", error.getExtension());
+        assertEquals("Unsupported format. hwp/hwpx documents are blocked by default.", error.getMessage());
+    }
 }

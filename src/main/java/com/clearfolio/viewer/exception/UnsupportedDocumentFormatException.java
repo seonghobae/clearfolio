@@ -15,8 +15,15 @@ public class UnsupportedDocumentFormatException extends IllegalArgumentException
      * @param extension blocked extension value
      */
     public UnsupportedDocumentFormatException(String extension) {
-        super("Unsupported format: " + extension + ". hwp/hwpx documents are blocked by default.");
+        super(buildMessage(extension));
         this.extension = extension;
+    }
+
+    private static String buildMessage(String extension) {
+        if (extension == null || extension.isBlank()) {
+            return "Unsupported format. hwp/hwpx documents are blocked by default.";
+        }
+        return "Unsupported format: " + extension + ". hwp/hwpx documents are blocked by default.";
     }
 
     /**
