@@ -2,27 +2,33 @@
 
 This document covers the upload path for `POST /api/v1/convert/jobs`, including supported-success and exception branches.
 
+Implementation note: request handling is currently on Spring WebFlux (non-blocking web stance), while conversion work runs in a bounded asynchronous worker queue.
+
 ## Component diagram
 
 ```mermaid
 flowchart TB
   Client[Client]
+  WebFlux[Spring WebFlux Runtime]
   Controller[ConversionController]
   Service[DocumentConversionService]
   Validation[DocumentValidationService]
   Properties[ConversionProperties\nblocked-extensions]
   Repository[InMemoryConversionJobRepository]
+  Queue[ThreadPoolTaskExecutor\nlightweight bounded queue]
   Worker[ConversionWorker / DefaultConversionWorker]
   ExceptionHandler[ApiExceptionHandler]
   ExceptionLane[(HWP/HWPX Exception\npolicy lane - planned)]
 
-  Client --> Controller
+  Client --> WebFlux
+  WebFlux --> Controller
   Controller --> Service
   Service --> Validation
   Validation --> Properties
   Validation --> Service
   Service --> Repository
-  Service --> Worker
+  Service --> Queue
+  Queue --> Worker
   Worker --> Repository
   Controller --> ExceptionHandler
   Validation --> ExceptionHandler
@@ -76,7 +82,7 @@ sequenceDiagram
       Repo-->>Svc: canonical job id
 
       alt first submission of hash
-        Svc->>W: enqueue(jobId)
+        Svc->>W: enqueue(jobId) via bounded queue
       else duplicate hash
         Svc->>Svc: reuse canonical jobId
       end
@@ -94,3 +100,11 @@ sequenceDiagram
 - HWP/HWPX blocked extension
 - Hashing failure during submit (mapped to generic server error currently)
 - Duplicate submission reused from canonical hash
+
+## File-level evidence pointers
+
+- WebFlux runtime dependency: `pom.xml`
+- Submit endpoint behavior: `src/main/java/com/clearfolio/viewer/controller/ConversionController.java`
+- Submit orchestration and dedupe: `src/main/java/com/clearfolio/viewer/service/DefaultDocumentConversionService.java`
+- Bounded queue config: `src/main/java/com/clearfolio/viewer/config/ConversionExecutorConfig.java`
+- Retry/dead-letter worker logic: `src/main/java/com/clearfolio/viewer/service/DefaultConversionWorker.java`

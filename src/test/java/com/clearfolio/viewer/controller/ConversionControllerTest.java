@@ -1,119 +1,179 @@
 package com.clearfolio.viewer.controller;
 
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.emptyOrNullString;
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.http.codec.multipart.FilePart;
+import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.unit.DataSize;
+import org.springframework.web.reactive.function.BodyInserters;
 
+import com.clearfolio.viewer.exception.UnsupportedDocumentFormatException;
 import com.clearfolio.viewer.model.ConversionJob;
 import com.clearfolio.viewer.model.ConversionJobStatus;
-import com.clearfolio.viewer.exception.UnsupportedDocumentFormatException;
 import com.clearfolio.viewer.service.DocumentConversionService;
 
-@WebMvcTest(ConversionController.class)
 class ConversionControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+    private WebTestClient webTestClient;
 
-    @MockBean
     private DocumentConversionService conversionService;
 
-    @Test
-    void submitReturnsAcceptedWithJobId() throws Exception {
-        UUID jobId = UUID.randomUUID();
-        when(conversionService.submit(Mockito.any())).thenReturn(jobId);
+    private ConversionController controller;
 
-        MockMultipartFile file = new MockMultipartFile(
-                "file",
-                "report.docx",
-                MediaType.APPLICATION_OCTET_STREAM_VALUE,
-                "hello".getBytes()
-        );
-
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/v1/convert/jobs")
-                        .file(file)
-                        .with(request -> {
-                            request.setMethod("POST");
-                            return request;
-                        }))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isAccepted())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.jobId", equalTo(jobId.toString())))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status", equalTo("ACCEPTED")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.statusUrl", equalTo("/api/v1/convert/jobs/" + jobId)));
+    @BeforeEach
+    void setUp() {
+        conversionService = mock(DocumentConversionService.class);
+        controller = new ConversionController(conversionService, DataSize.ofBytes(262_144L));
+        webTestClient = WebTestClient.bindToController(
+                controller
+        ).controllerAdvice(new ApiExceptionHandler()).build();
     }
 
     @Test
-    void submitReturnsUnsupportedFormatErrorPayload() throws Exception {
+    void constructorCapsMaxInMemorySizeAtIntegerMaxValue() throws Exception {
+        ConversionController controller = new ConversionController(
+                conversionService,
+                DataSize.ofBytes((long) Integer.MAX_VALUE + 1)
+        );
+        Field field = ConversionController.class.getDeclaredField("maxInMemorySizeBytes");
+        field.setAccessible(true);
+
+        assertEquals(Integer.MAX_VALUE, field.getInt(controller));
+    }
+
+    @Test
+    void toMultipartFileHandlesMissingContentTypeHeader() throws Exception {
+        FilePart filePart = mock(FilePart.class);
+        HttpHeaders headers = new HttpHeaders();
+        when(filePart.headers()).thenReturn(headers);
+        when(filePart.filename()).thenReturn("report.docx");
+
+        DataBuffer dataBuffer = DefaultDataBufferFactory.sharedInstance.wrap("abc".getBytes());
+        Method method = ConversionController.class.getDeclaredMethod(
+                "toMultipartFile",
+                FilePart.class,
+                DataBuffer.class
+        );
+        method.setAccessible(true);
+
+        InMemoryMultipartFile file = (InMemoryMultipartFile) method.invoke(controller, filePart, dataBuffer);
+
+        assertNull(file.getContentType());
+        assertEquals("report.docx", file.getOriginalFilename());
+        assertEquals(3L, file.getSize());
+    }
+
+    @Test
+    void toMultipartFileHandlesNullContentTypeValue() throws Exception {
+        FilePart filePart = mock(FilePart.class);
+        HttpHeaders headers = mock(HttpHeaders.class);
+        when(headers.containsKey(HttpHeaders.CONTENT_TYPE)).thenReturn(true);
+        when(headers.getContentType()).thenReturn(null);
+        when(filePart.headers()).thenReturn(headers);
+        when(filePart.filename()).thenReturn("report.docx");
+
+        DataBuffer dataBuffer = DefaultDataBufferFactory.sharedInstance.wrap("abc".getBytes());
+        Method method = ConversionController.class.getDeclaredMethod(
+                "toMultipartFile",
+                FilePart.class,
+                DataBuffer.class
+        );
+        method.setAccessible(true);
+
+        InMemoryMultipartFile file = (InMemoryMultipartFile) method.invoke(controller, filePart, dataBuffer);
+
+        assertNull(file.getContentType());
+    }
+
+    @Test
+    void submitReturnsAcceptedWithJobId() {
+        UUID jobId = UUID.randomUUID();
+        when(conversionService.submit(any())).thenReturn(jobId);
+
+        submit("report.docx", "hello".getBytes())
+                .expectStatus().isAccepted()
+                .expectBody()
+                .jsonPath("$.jobId").isEqualTo(jobId.toString())
+                .jsonPath("$.status").isEqualTo("ACCEPTED")
+                .jsonPath("$.statusUrl").isEqualTo("/api/v1/convert/jobs/" + jobId);
+    }
+
+    @Test
+    void submitReturnsUnsupportedFormatErrorPayload() {
         when(conversionService.submit(any())).thenThrow(new UnsupportedDocumentFormatException("hwp"));
 
-        MockMultipartFile file = new MockMultipartFile(
-                "file",
-                "contract.hwp",
-                MediaType.APPLICATION_OCTET_STREAM_VALUE,
-                "hello".getBytes()
-        );
-
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/v1/convert/jobs")
-                        .file(file)
-                        .with(request -> {
-                            request.setMethod("POST");
-                            return request;
-                        }))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.errorCode", equalTo("UNSUPPORTED_FORMAT")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code", equalTo("UNSUPPORTED_FORMAT")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.details.extension", equalTo("hwp")))
-                         .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.traceId", org.hamcrest.Matchers.not(emptyOrNullString())));
+        submit("contract.hwp", "hello".getBytes())
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("UNSUPPORTED_FORMAT")
+                .jsonPath("$.code").isEqualTo("UNSUPPORTED_FORMAT")
+                .jsonPath("$.details.extension").isEqualTo("hwp")
+                .jsonPath("$.traceId").value(ConversionControllerTest::assertNonBlankTraceId);
     }
 
     @Test
-    void submitReturnsBadRequestWhenFilePartIsMissing() throws Exception {
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/v1/convert/jobs"))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.errorCode", equalTo("BAD_REQUEST")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code", equalTo("BAD_REQUEST")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.traceId", org.hamcrest.Matchers.not(emptyOrNullString())));
+    void submitReturnsBadRequestWhenFilePartIsMissing() {
+        webTestClient.post()
+                .uri("/api/v1/convert/jobs")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(BodyInserters.fromMultipartData(new LinkedMultiValueMap<>()))
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("BAD_REQUEST")
+                .jsonPath("$.code").isEqualTo("BAD_REQUEST")
+                .jsonPath("$.traceId").value(ConversionControllerTest::assertNonBlankTraceId);
     }
 
     @Test
-    void statusReturnsNotFoundWhenJobMissing() throws Exception {
+    void statusReturnsNotFoundWhenJobMissing() {
         UUID jobId = UUID.randomUUID();
         when(conversionService.getJob(jobId)).thenReturn(Optional.empty());
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/convert/jobs/{jobId}", jobId))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.errorCode", equalTo("NOT_FOUND")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code", equalTo("NOT_FOUND")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message", equalTo("job not found")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.traceId", org.hamcrest.Matchers.not(emptyOrNullString())));
+        webTestClient.get()
+                .uri("/api/v1/convert/jobs/{jobId}", jobId)
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("NOT_FOUND")
+                .jsonPath("$.code").isEqualTo("NOT_FOUND")
+                .jsonPath("$.message").isEqualTo("job not found")
+                .jsonPath("$.traceId").value(ConversionControllerTest::assertNonBlankTraceId);
     }
 
     @Test
-    void statusReturnsBadRequestForMalformedJobId() throws Exception {
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/convert/jobs/{jobId}", "not-a-uuid"))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.errorCode", equalTo("BAD_REQUEST")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code", equalTo("BAD_REQUEST")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.traceId", org.hamcrest.Matchers.not(emptyOrNullString())));
+    void statusReturnsBadRequestForMalformedJobId() {
+        webTestClient.get()
+                .uri("/api/v1/convert/jobs/{jobId}", "not-a-uuid")
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("BAD_REQUEST")
+                .jsonPath("$.code").isEqualTo("BAD_REQUEST")
+                .jsonPath("$.traceId").value(ConversionControllerTest::assertNonBlankTraceId);
     }
 
     @Test
-    void statusReturnsJobWhenFound() throws Exception {
+    void statusReturnsJobWhenFound() {
         UUID jobId = UUID.randomUUID();
         ConversionJob job = new ConversionJob(
                 jobId,
@@ -124,19 +184,22 @@ class ConversionControllerTest {
         );
         when(conversionService.getJob(jobId)).thenReturn(Optional.of(job));
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/convert/jobs/{jobId}", jobId))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.jobId", equalTo(jobId.toString())))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status", equalTo(ConversionJobStatus.SUBMITTED.name())))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.fileName", equalTo("report.docx")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.attemptCount", equalTo(0)))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.maxAttempts", equalTo(3)))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.deadLettered", equalTo(false)))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.retryAt", nullValue()));
+        webTestClient.get()
+                .uri("/api/v1/convert/jobs/{jobId}", jobId)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.jobId").isEqualTo(jobId.toString())
+                .jsonPath("$.status").isEqualTo(ConversionJobStatus.SUBMITTED.name())
+                .jsonPath("$.fileName").isEqualTo("report.docx")
+                .jsonPath("$.attemptCount").isEqualTo(0)
+                .jsonPath("$.maxAttempts").isEqualTo(3)
+                .jsonPath("$.deadLettered").isEqualTo(false)
+                .jsonPath("$.retryAt").isEmpty();
     }
 
     @Test
-    void statusReturnsDeadLetteredMetadataWhenJobIsTerminalFailed() throws Exception {
+    void statusReturnsDeadLetteredMetadataWhenJobIsTerminalFailed() {
         UUID jobId = UUID.randomUUID();
         ConversionJob job = new ConversionJob(
                 jobId,
@@ -148,14 +211,17 @@ class ConversionControllerTest {
         job.markDeadLettered("retries exhausted");
         when(conversionService.getJob(jobId)).thenReturn(Optional.of(job));
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/convert/jobs/{jobId}", jobId))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status", equalTo(ConversionJobStatus.FAILED.name())))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.deadLettered", equalTo(true)));
+        webTestClient.get()
+                .uri("/api/v1/convert/jobs/{jobId}", jobId)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(ConversionJobStatus.FAILED.name())
+                .jsonPath("$.deadLettered").isEqualTo(true);
     }
 
     @Test
-    void viewerReturnsConflictForSubmittedStatus() throws Exception {
+    void viewerReturnsConflictForSubmittedStatus() {
         UUID docId = UUID.randomUUID();
         ConversionJob job = new ConversionJob(
                 docId,
@@ -166,16 +232,19 @@ class ConversionControllerTest {
         );
         when(conversionService.getJob(docId)).thenReturn(Optional.of(job));
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/viewer/{docId}", docId))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.errorCode", equalTo("CONFLICT")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code", equalTo("CONFLICT")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message", containsString("retry")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.traceId", org.hamcrest.Matchers.not(emptyOrNullString())));
+        webTestClient.get()
+                .uri("/viewer/{docId}", docId)
+                .exchange()
+                .expectStatus().isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("CONFLICT")
+                .jsonPath("$.code").isEqualTo("CONFLICT")
+                .jsonPath("$.message").value(value -> assertContains((String) value, "retry"))
+                .jsonPath("$.traceId").value(ConversionControllerTest::assertNonBlankTraceId);
     }
 
     @Test
-    void viewerReturnsConflictForProcessingStatus() throws Exception {
+    void viewerReturnsConflictForProcessingStatus() {
         UUID docId = UUID.randomUUID();
         ConversionJob job = new ConversionJob(
                 docId,
@@ -187,16 +256,19 @@ class ConversionControllerTest {
         job.markProcessing("conversion started");
         when(conversionService.getJob(docId)).thenReturn(Optional.of(job));
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/viewer/{docId}", docId))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.errorCode", equalTo("CONFLICT")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code", equalTo("CONFLICT")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message", containsString("retry")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.traceId", org.hamcrest.Matchers.not(emptyOrNullString())));
+        webTestClient.get()
+                .uri("/viewer/{docId}", docId)
+                .exchange()
+                .expectStatus().isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("CONFLICT")
+                .jsonPath("$.code").isEqualTo("CONFLICT")
+                .jsonPath("$.message").value(value -> assertContains((String) value, "retry"))
+                .jsonPath("$.traceId").value(ConversionControllerTest::assertNonBlankTraceId);
     }
 
     @Test
-    void viewerReturnsConflictForFailedStatus() throws Exception {
+    void viewerReturnsConflictForFailedStatus() {
         UUID docId = UUID.randomUUID();
         ConversionJob job = new ConversionJob(
                 docId,
@@ -208,16 +280,19 @@ class ConversionControllerTest {
         job.markFailed("conversion failed");
         when(conversionService.getJob(docId)).thenReturn(Optional.of(job));
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/viewer/{docId}", docId))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.errorCode", equalTo("CONFLICT")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code", equalTo("CONFLICT")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message", containsString("FAILED")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.traceId", org.hamcrest.Matchers.not(emptyOrNullString())));
+        webTestClient.get()
+                .uri("/viewer/{docId}", docId)
+                .exchange()
+                .expectStatus().isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("CONFLICT")
+                .jsonPath("$.code").isEqualTo("CONFLICT")
+                .jsonPath("$.message").value(value -> assertContains((String) value, "FAILED"))
+                .jsonPath("$.traceId").value(ConversionControllerTest::assertNonBlankTraceId);
     }
 
     @Test
-    void viewerReturnsConflictForDeadLetteredStatus() throws Exception {
+    void viewerReturnsConflictForDeadLetteredStatus() {
         UUID docId = UUID.randomUUID();
         ConversionJob job = new ConversionJob(
                 docId,
@@ -229,16 +304,19 @@ class ConversionControllerTest {
         job.markDeadLettered("retries exhausted");
         when(conversionService.getJob(docId)).thenReturn(Optional.of(job));
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/viewer/{docId}", docId))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.errorCode", equalTo("CONFLICT")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code", equalTo("CONFLICT")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message", containsString("DEAD_LETTERED")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.traceId", org.hamcrest.Matchers.not(emptyOrNullString())));
+        webTestClient.get()
+                .uri("/viewer/{docId}", docId)
+                .exchange()
+                .expectStatus().isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("CONFLICT")
+                .jsonPath("$.code").isEqualTo("CONFLICT")
+                .jsonPath("$.message").value(value -> assertContains((String) value, "DEAD_LETTERED"))
+                .jsonPath("$.traceId").value(ConversionControllerTest::assertNonBlankTraceId);
     }
 
     @Test
-    void viewerReturnsBootstrapForSucceededStatus() throws Exception {
+    void viewerReturnsBootstrapForSucceededStatus() {
         UUID docId = UUID.randomUUID();
         ConversionJob job = new ConversionJob(
                 docId,
@@ -250,29 +328,35 @@ class ConversionControllerTest {
         job.markSucceeded("/artifacts/report.pdf", "conversion completed");
         when(conversionService.getJob(docId)).thenReturn(Optional.of(job));
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/viewer/{docId}", docId))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.docId", equalTo(docId.toString())))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status", equalTo(ConversionJobStatus.SUCCEEDED.name())))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.fileName", equalTo("report.docx")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.previewResourcePath", equalTo("/artifacts/report.pdf")));
+        webTestClient.get()
+                .uri("/viewer/{docId}", docId)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.docId").isEqualTo(docId.toString())
+                .jsonPath("$.status").isEqualTo(ConversionJobStatus.SUCCEEDED.name())
+                .jsonPath("$.fileName").isEqualTo("report.docx")
+                .jsonPath("$.previewResourcePath").isEqualTo("/artifacts/report.pdf");
     }
 
     @Test
-    void viewerReturnsNotFoundWhenJobMissing() throws Exception {
+    void viewerReturnsNotFoundWhenJobMissing() {
         UUID docId = UUID.randomUUID();
         when(conversionService.getJob(docId)).thenReturn(Optional.empty());
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/viewer/{docId}", docId))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.errorCode", equalTo("NOT_FOUND")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code", equalTo("NOT_FOUND")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message", equalTo("job not found")))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.traceId", org.hamcrest.Matchers.not(emptyOrNullString())));
+        webTestClient.get()
+                .uri("/viewer/{docId}", docId)
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("NOT_FOUND")
+                .jsonPath("$.code").isEqualTo("NOT_FOUND")
+                .jsonPath("$.message").isEqualTo("job not found")
+                .jsonPath("$.traceId").value(ConversionControllerTest::assertNonBlankTraceId);
     }
 
     @Test
-    void viewerAliasRoutesReturnConflictForSubmittedStatus() throws Exception {
+    void viewerAliasRoutesReturnConflictForSubmittedStatus() {
         UUID docId = UUID.randomUUID();
         ConversionJob job = new ConversionJob(
                 docId,
@@ -285,15 +369,18 @@ class ConversionControllerTest {
 
         String[] aliasEndpoints = {"/api/v1/viewer/{docId}", "/api/v1/convert/viewer/{docId}"};
         for (String endpoint : aliasEndpoints) {
-            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(endpoint, docId))
-                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict())
-                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.errorCode", equalTo("CONFLICT")))
-                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message", containsString("retry")));
+            webTestClient.get()
+                    .uri(endpoint, docId)
+                    .exchange()
+                    .expectStatus().isEqualTo(409)
+                    .expectBody()
+                    .jsonPath("$.errorCode").isEqualTo("CONFLICT")
+                    .jsonPath("$.message").value(value -> assertContains((String) value, "retry"));
         }
     }
 
     @Test
-    void viewerAliasRoutesReturnBootstrapWhenReady() throws Exception {
+    void viewerAliasRoutesReturnBootstrapWhenReady() {
         UUID docId = UUID.randomUUID();
         ConversionJob job = new ConversionJob(
                 docId,
@@ -307,11 +394,36 @@ class ConversionControllerTest {
 
         String[] aliasEndpoints = {"/api/v1/viewer/{docId}", "/api/v1/convert/viewer/{docId}"};
         for (String endpoint : aliasEndpoints) {
-            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(endpoint, docId))
-                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
-                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.docId", equalTo(docId.toString())))
-                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status", equalTo(ConversionJobStatus.SUCCEEDED.name())))
-                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.previewResourcePath", equalTo("/artifacts/report.pdf")));
+            webTestClient.get()
+                    .uri(endpoint, docId)
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.docId").isEqualTo(docId.toString())
+                    .jsonPath("$.status").isEqualTo(ConversionJobStatus.SUCCEEDED.name())
+                    .jsonPath("$.previewResourcePath").isEqualTo("/artifacts/report.pdf");
         }
+    }
+
+    private WebTestClient.ResponseSpec submit(String filename, byte[] content) {
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+        builder.part("file", content)
+                .filename(filename)
+                .contentType(MediaType.APPLICATION_OCTET_STREAM);
+
+        return webTestClient.post()
+                .uri("/api/v1/convert/jobs")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(BodyInserters.fromMultipartData(builder.build()))
+                .exchange();
+    }
+
+    private static void assertContains(String actual, String expected) {
+        assertTrue(actual.contains(expected));
+    }
+
+    private static void assertNonBlankTraceId(Object value) {
+        String traceId = (String) value;
+        assertFalse(traceId.isBlank());
     }
 }

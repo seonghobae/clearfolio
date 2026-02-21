@@ -1,6 +1,7 @@
 # PRD: Integrated Document Viewer Platform (MVP)
 
 Date: 2026-02-19
+Last updated: 2026-02-21
 Owner: Product Manager
 Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.md`, `docs/diagrams/*`
 
@@ -14,6 +15,7 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 
 - Deliver one integrated flow: upload -> async processing -> status -> preview (`/viewer/{docId}`).
 - Keep submission and status APIs non-blocking for request threads.
+- Keep implementation on WebFlux non-blocking runtime (adopted) rather than Servlet/MVC execution path.
 - Standardize conversion states, errors, tracing, and audit events for predictable operations.
 - Build a production-hardened MVP baseline within current architecture.
 
@@ -56,6 +58,8 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 - S2S preview session bootstrap is planned and documented as a post-success shell
   orchestration extension (viewer-path decision point), but does not change current
   contract of status/viewer state response.
+- Delivery chain for customer context is explicitly tracked as:
+  - `Clearfolio Viewer <-> internal WAS -> Azure On-premise Gateway -> Power Platform -> mobile/tablet`
 
 ### Out-of-Scope
 
@@ -118,6 +122,20 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 
 ## 9. Acceptance Criteria
 
+### Mandatory AC list (exact)
+
+1. coverage
+2. docstring
+3. non-blocking web
+4. lightweight queue
+5. warning 0
+6. deprecated 0
+7. 1-day schedule+security verification
+
+Reference policy: `docs/engineering/acceptance-criteria.md`.
+
+### AC detail list
+
 - AC-01: `POST /api/v1/convert/jobs` responds with 202 within the target P95 and no inline conversion execution.
 - AC-02: Status endpoint reliably returns current state and supports polling with stable schema.
 - AC-03: Viewer route is state-gated and does not leak intermediate artifacts.
@@ -167,6 +185,29 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 - AC-15 **IMPLEMENTED (planning+evidence)**: 24-hour delivery schedule and security verification checkpoints are documented and execution evidence is stored for handoff.
   - Evidence: `docs/plans/2026-02-20-24h-customer-delivery-plan.md`, `docs/qa/acceptance_evidence_checklist.md`, `docs/qa/evidence/2026-02-21-ac-gates/SUMMARY.md`.
 
+### Optional tracks
+
+- client DB pooler
+- PostgreSQL 17
+
+### OSS references (implementation and concept)
+
+| OSS repo | License | Usage status | Trade-off note |
+| --- | --- | --- | --- |
+| `spring-projects/spring-framework` | Apache-2.0 | Implemented (WebFlux) | Reactive model improves concurrency but needs strict blocking isolation. |
+| `reactor/reactor-core` | Apache-2.0 | Implemented | Strong async composition; operator misuse can reduce readability. |
+| `apache/tika` | Apache-2.0 | Implemented | Broad parsing support, with larger dependency surface. |
+| `jodconverter/jodconverter` | Concept-only (license/legal clarity pending in this repo) | Not implemented | Converter integration option; legal/package governance required first. |
+
+### File-level evidence pointers
+
+| File | Change(add/edit/delete/move) | Intent(의도) | Why(이유) | Risk/Notes |
+|---|---|---|---|---|
+| `pom.xml` | edit (existing implementation baseline) | Confirm WebFlux adoption evidence | Supports non-blocking web AC | Do not infer Servlet runtime from old docs |
+| `src/main/java/com/clearfolio/viewer/controller/ConversionController.java` | edit (existing implementation baseline) | Confirm submit/status/viewer contracts | AC-01/02/03/11 evidence | S2S token orchestration is not implemented here |
+| `src/main/java/com/clearfolio/viewer/service/DefaultConversionWorker.java` | edit (existing implementation baseline) | Confirm queue, retry, dead-letter behavior | AC-12 evidence | In-memory worker simulation (MVP) |
+| `docs/qa/evidence/2026-02-21-ac-gates/SUMMARY.md` | edit (existing evidence baseline) | Link latest gate outputs | AC-09/13/14/15 traceability | Snapshot tied to specific run |
+
 ## 10. Release Plan
 
 - **Week 1-2:** Contract freeze, schema/queue adapter design, and API validation hardening.
@@ -186,3 +227,7 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 - Assumption: `read-only` DB endpoints may be available and should be used for read-biased flows when safe.
 - Risk: converter engine selection and rollout strategy may shift timeline by 1-2 weeks.
 - Risk: strict HWP/HWPX exception workflow can expand scope if policy ownership is unclear.
+
+## Architecture source of truth
+
+- Root map: `ARCHITECTURE.md` (last updated 2026-02-21).

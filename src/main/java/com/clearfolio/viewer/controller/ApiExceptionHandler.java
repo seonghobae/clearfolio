@@ -3,18 +3,20 @@ package com.clearfolio.viewer.controller;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.UUID;
-
-import jakarta.servlet.http.HttpServletRequest;
+import java.net.URI;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.buffer.DataBufferLimitException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
-import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.ServerWebInputException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -29,22 +31,25 @@ public class ApiExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
+    @Value("${conversion.max-upload-size-bytes:5242880}")
+    private long configuredMaxUploadSize = 5242880L;
+
     /**
      * Handles blocked or unsupported document format requests.
      *
      * @param ex thrown format exception
-     * @param request current HTTP request
+     * @param exchange current HTTP exchange
      * @return bad request response with format details
      */
     @ExceptionHandler(UnsupportedDocumentFormatException.class)
     public ResponseEntity<ApiErrorResponse> handleUnsupported(
             UnsupportedDocumentFormatException ex,
-            HttpServletRequest request) {
+            ServerWebExchange exchange) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ApiErrorResponse(
                         "UNSUPPORTED_FORMAT",
                         ex.getMessage(),
-                        resolveTraceId(request),
+                        resolveTraceId(exchange),
                         extensionDetails(ex.getExtension())
                 ));
     }
@@ -53,18 +58,18 @@ public class ApiExceptionHandler {
      * Handles generic validation failures represented as illegal arguments.
      *
      * @param ex thrown bad input exception
-     * @param request current HTTP request
+     * @param exchange current HTTP exchange
      * @return bad request response
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiErrorResponse> handleBadRequest(
             IllegalArgumentException ex,
-            HttpServletRequest request) {
+            ServerWebExchange exchange) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ApiErrorResponse(
                         "BAD_REQUEST",
                         ex.getMessage(),
-                        resolveTraceId(request),
+                        resolveTraceId(exchange),
                         Map.of()
                 ));
     }
@@ -73,39 +78,63 @@ public class ApiExceptionHandler {
      * Handles uploads that exceed configured multipart limits.
      *
      * @param ex thrown size limit exception
-     * @param request current HTTP request
+     * @param exchange current HTTP exchange
      * @return bad request response with size constraint details
      */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiErrorResponse> handleMaxUploadSizeExceeded(
             MaxUploadSizeExceededException ex,
-            HttpServletRequest request) {
+            ServerWebExchange exchange) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ApiErrorResponse(
                         "BAD_REQUEST",
                         "File is too large.",
-                        resolveTraceId(request),
-                        Map.of("maxUploadSize", ex.getMaxUploadSize())
+                        resolveTraceId(exchange),
+                        Map.of("maxUploadSize", resolveMaxUploadSize(ex.getMaxUploadSize()))
                 ));
     }
 
     /**
-     * Handles requests missing required multipart parts.
+     * Handles requests that fail web input binding and validation.
      *
-     * @param ex thrown missing part exception
-     * @param request current HTTP request
-     * @return bad request response with missing part details
+     * @param ex thrown web input exception
+     * @param exchange current HTTP exchange
+     * @return bad request response with optional part details
      */
-    @ExceptionHandler(MissingServletRequestPartException.class)
-    public ResponseEntity<ApiErrorResponse> handleMissingServletRequestPart(
-            MissingServletRequestPartException ex,
-            HttpServletRequest request) {
+    @ExceptionHandler(ServerWebInputException.class)
+    public ResponseEntity<ApiErrorResponse> handleServerWebInput(
+            ServerWebInputException ex,
+            ServerWebExchange exchange) {
+        String message = ex.getReason();
+        if (message == null || message.isBlank()) {
+            message = "Bad request";
+        }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ApiErrorResponse(
                         "BAD_REQUEST",
-                        ex.getMessage(),
-                        resolveTraceId(request),
-                        Map.of("part", ex.getRequestPartName())
+                        message,
+                        resolveTraceId(exchange),
+                        missingPartDetails(message)
+                ));
+    }
+
+    /**
+     * Handles payloads that exceed reactive in-memory buffering limits.
+     *
+     * @param ex thrown data buffer limit exception
+     * @param exchange current HTTP exchange
+     * @return bad request response
+     */
+    @ExceptionHandler(DataBufferLimitException.class)
+    public ResponseEntity<ApiErrorResponse> handleDataBufferLimit(
+            DataBufferLimitException ex,
+            ServerWebExchange exchange) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiErrorResponse(
+                        "BAD_REQUEST",
+                        "File is too large.",
+                        resolveTraceId(exchange),
+                        Map.of("maxUploadSize", resolveMaxUploadSize(-1L))
                 ));
     }
 
@@ -113,18 +142,18 @@ public class ApiExceptionHandler {
      * Handles path or query parameter type mismatches.
      *
      * @param ex thrown type mismatch exception
-     * @param request current HTTP request
+     * @param exchange current HTTP exchange
      * @return bad request response with parameter diagnostics
      */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiErrorResponse> handleTypeMismatch(
             MethodArgumentTypeMismatchException ex,
-            HttpServletRequest request) {
+            ServerWebExchange exchange) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ApiErrorResponse(
                         "BAD_REQUEST",
                         "Invalid value for parameter " + ex.getName(),
-                        resolveTraceId(request),
+                        resolveTraceId(exchange),
                         Map.of(
                                 "parameter", ex.getName(),
                                 "value", String.valueOf(ex.getValue())
@@ -136,13 +165,13 @@ public class ApiExceptionHandler {
      * Handles propagated Spring response status exceptions.
      *
      * @param ex thrown response status exception
-     * @param request current HTTP request
+     * @param exchange current HTTP exchange
      * @return response preserving the original status code and reason
      */
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiErrorResponse> handleResponseStatus(
             ResponseStatusException ex,
-            HttpServletRequest request) {
+            ServerWebExchange exchange) {
         String reason = ex.getReason();
         if (reason == null || reason.isBlank()) {
             reason = "HTTP " + ex.getStatusCode().value();
@@ -151,7 +180,7 @@ public class ApiExceptionHandler {
                 .body(new ApiErrorResponse(
                         normalizeStatusCode(ex.getStatusCode()),
                         reason,
-                        resolveTraceId(request),
+                        resolveTraceId(exchange),
                         Map.of()
                 ));
     }
@@ -160,17 +189,19 @@ public class ApiExceptionHandler {
      * Handles uncaught exceptions with a generic internal error payload.
      *
      * @param ex unexpected exception
-     * @param request current HTTP request
+     * @param exchange current HTTP exchange
      * @return internal server error response
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleUnexpected(
             Exception ex,
-            HttpServletRequest request) {
-        String traceId = resolveTraceId(request);
+            ServerWebExchange exchange) {
+        String traceId = resolveTraceId(exchange);
+        URI requestUri = exchange.getRequest().getURI();
+        String path = requestUri == null ? "" : requestUri.getRawPath();
         LOGGER.error(
                 "Unexpected error on path={} traceId={}",
-                sanitizeForLog(request.getRequestURI()),
+                sanitizeForLog(path),
                 sanitizeForLog(traceId),
                 ex
         );
@@ -183,13 +214,13 @@ public class ApiExceptionHandler {
                 ));
     }
 
-    private String resolveTraceId(HttpServletRequest request) {
-        String header = request.getHeader("X-Trace-Id");
+    private String resolveTraceId(ServerWebExchange exchange) {
+        String header = exchange.getRequest().getHeaders().getFirst("X-Trace-Id");
         if (header != null && !header.isBlank()) {
             return header;
         }
 
-        String requestId = request.getRequestId();
+        String requestId = exchange.getRequest().getId();
         if (requestId != null && !requestId.isBlank()) {
             return requestId;
         }
@@ -230,5 +261,34 @@ public class ApiExceptionHandler {
         LinkedHashMap<String, Object> details = new LinkedHashMap<>();
         details.put("extension", extension);
         return details;
+    }
+
+    private Map<String, Object> missingPartDetails(String message) {
+        if (message == null) {
+            return Map.of();
+        }
+
+        String prefix = "Required request part '";
+        int partStart = message.indexOf(prefix);
+        if (partStart < 0) {
+            return Map.of();
+        }
+
+        int nameStart = partStart + prefix.length();
+        int nameEnd = message.indexOf('\'', nameStart);
+        if (nameEnd < 0) {
+            return Map.of();
+        }
+
+        String partName = message.substring(nameStart, nameEnd);
+        if (partName.isBlank()) {
+            return Map.of();
+        }
+
+        return Map.of("part", partName);
+    }
+
+    private long resolveMaxUploadSize(long exceptionMaxUploadSize) {
+        return exceptionMaxUploadSize > 0 ? exceptionMaxUploadSize : configuredMaxUploadSize;
     }
 }

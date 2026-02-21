@@ -1,2 +1,1 @@
-javadoc_exit=0
-javadoc_warnings_or_errors=none
+PASS
