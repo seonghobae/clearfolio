@@ -1,0 +1,3 @@
+Analyze (java-kotlin)	pass	1m27s	https://github.com/seonghobae/clearfolio/actions/runs/22246743088/job/64362262157	
+CodeQL	pass	3s	https://github.com/seonghobae/clearfolio/runs/64362344735	
+CodeRabbit	pass	0		Review completed

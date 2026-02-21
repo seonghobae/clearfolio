@@ -35,16 +35,30 @@ Target: customer-deliverable package within one business day
 REPO_OWNER="<owner>"
 REPO_NAME="<repo>"
 PR_NUMBER="<pr-number>"
+RUN_ID="<run-id>"
+EVIDENCE_DIR="docs/qa/evidence/${RUN_ID}"
+mkdir -p "${EVIDENCE_DIR}"
 
-semgrep --config auto --error --json --output target/semgrep.json src/main/java
+semgrep --config auto --metrics=off --error --json --output "${EVIDENCE_DIR}/semgrep.json" src/main/java
 gh api "/repos/${REPO_OWNER}/${REPO_NAME}/code-scanning/analyses?pr=${PR_NUMBER}"
 gh api "/repos/${REPO_OWNER}/${REPO_NAME}/code-scanning/alerts?pr=${PR_NUMBER}&state=open"
 ```
 
 ## Delivery evidence checklist
 
-- `target/site/jacoco/jacoco.csv`
-- `target/semgrep.json`
+- `docs/qa/evidence/<run-id>/jacoco.csv`
+- `docs/qa/evidence/<run-id>/semgrep.json`
 - compile/test logs (warning/deprecated count)
 - markdown lint output for updated docs
 - PR checks and merge-state evidence comment
+
+## Execution log (latest)
+
+| Executed at (KST) | Runner | Scope | Result | Artifact |
+|---|---|---|---|---|
+| 2026-02-21 | local CLI | Compile gate (`mvn -q -DskipTests compile`) | PASS | `docs/qa/evidence/2026-02-21-ac-gates/compile.log` |
+| 2026-02-21 | local CLI | Test gate (`mvn test`) | PASS | `docs/qa/evidence/2026-02-21-ac-gates/test.log` |
+| 2026-02-21 | local CLI | Coverage gate (JaCoCo) | PASS (line/branch missed=0) | `docs/qa/evidence/2026-02-21-ac-gates/jacoco.csv` |
+| 2026-02-21 | local CLI | Doc lint gate | PASS | `docs/qa/evidence/2026-02-21-ac-gates/markdownlint.log` |
+| 2026-02-21 | local CLI | SAST (semgrep) | PASS (0 findings) | `docs/qa/evidence/2026-02-21-ac-gates/semgrep.json` |
+| 2026-02-21 | GitHub API | Code scanning alerts (PR) | PASS (open alerts=0) | `docs/qa/evidence/2026-02-21-ac-gates/gh-code-scanning-alerts-open.json` |

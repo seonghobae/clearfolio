@@ -153,9 +153,9 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
   - Evidence: `docs/qa/smoke_test_plan.md`.
 - AC-08 **PLANNED**: mobile viewer shell states are defined for roadmap and require responsive UI validation before sign-off.
 - AC-09 **IMPLEMENTED**: JaCoCo report is generated with line/branch 100% evidence for current production classes.
-  - Evidence: `target/site/jacoco/jacoco.csv`.
-- AC-10 **IMPLEMENTED**: public production API surfaces are documented with JavaDoc.
-  - Evidence: `src/main/java/**/*.java`.
+  - Evidence: `docs/qa/evidence/2026-02-21-ac-gates/jacoco.csv`.
+- AC-10 **IMPLEMENTED**: public production API surfaces are documented with JavaDoc and javadoc build gate passes.
+  - Evidence: `src/main/java/**/*.java`, `docs/qa/evidence/2026-02-21-ac-gates/javadoc-status.txt`.
 - AC-11 **IMPLEMENTED (MVP)**: request thread returns quickly and conversion work is offloaded to worker queue.
   - Evidence: `src/main/java/com/clearfolio/viewer/service/DefaultDocumentConversionService.java`, `src/main/java/com/clearfolio/viewer/service/DefaultConversionWorker.java`.
 - AC-12 **IMPLEMENTED (MVP)**: bounded async executor + retry/dead-letter flags are present in current queue path.
@@ -164,8 +164,8 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
   - Evidence: `pom.xml` (`maven-compiler-plugin`, `maven-surefire-plugin`).
 - AC-14 **IMPLEMENTED**: build is configured to fail on deprecated usage warnings.
   - Evidence: `pom.xml` (`-Xlint:all`, `-Werror`).
-- AC-15 **IMPLEMENTED (planning+evidence)**: 24-hour delivery schedule and security verification checkpoints are documented for immediate customer-ready handoff.
-  - Evidence: `docs/plans/2026-02-20-24h-customer-delivery-plan.md`, `docs/qa/acceptance_evidence_checklist.md`.
+- AC-15 **IMPLEMENTED (planning+evidence)**: 24-hour delivery schedule and security verification checkpoints are documented and execution evidence is stored for handoff.
+  - Evidence: `docs/plans/2026-02-20-24h-customer-delivery-plan.md`, `docs/qa/acceptance_evidence_checklist.md`, `docs/qa/evidence/2026-02-21-ac-gates/SUMMARY.md`.
 
 ## 10. Release Plan
 

@@ -6,7 +6,7 @@ target/
 .project
 .settings/
 *.log
-evidence/
+/evidence/
 
 # Local env and secret material
 .env

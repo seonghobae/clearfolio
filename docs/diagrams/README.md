@@ -2,6 +2,10 @@
 
 This folder contains UML documentation files for the Integrated Document Viewer flows.
 
+Legend:
+- Solid component/flow: implemented in current MVP backend.
+- Dashed component/flow or explicit `planned` note: documented next-step scope, not yet implemented.
+
 - `submit-flow.md`
   - Submit API component and sequence path.
   - Covers successful submit, duplicate handling, and HWP/HWPX blocked/error branches.

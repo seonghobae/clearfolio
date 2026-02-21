@@ -2,20 +2,26 @@
 
 This checklist captures mandatory/optional acceptance evidence for current MVP release gates.
 
+- Latest evidence index: `docs/qa/evidence/LATEST.md`
+- Current run folder: `docs/qa/evidence/2026-02-21-ac-gates`
+
 ## Mandatory gates
 
 1. Test coverage 100%
    - Command:
      - `mvn -q -Djacoco.includes=com.clearfolio.viewer.* org.jacoco:jacoco-maven-plugin:0.8.13:prepare-agent test org.jacoco:jacoco-maven-plugin:0.8.13:report`
    - Evidence:
-     - `target/site/jacoco/jacoco.csv`
+     - `docs/qa/evidence/2026-02-21-ac-gates/jacoco.csv`
      - `line_missed=0`, `branch_missed=0`
 
 2. Docstring 100%
    - Scope:
-     - Public production symbols under `src/main/java`.
+      - Public production symbols under `src/main/java`.
+   - Command:
+      - `mvn -q -DskipTests javadoc:javadoc`
    - Evidence:
-     - JavaDoc comments present for public class/interface/record/enum and public methods/constructors.
+      - `docs/qa/evidence/2026-02-21-ac-gates/javadoc.log`
+      - `docs/qa/evidence/2026-02-21-ac-gates/javadoc-status.txt` (`javadoc_warnings_or_errors=none`)
 
 3. Non-blocking web path
    - Criteria:
@@ -37,13 +43,17 @@ This checklist captures mandatory/optional acceptance evidence for current MVP r
    - Command:
      - `mvn -q -DskipTests compile`
    - Gate:
-     - Build fails on warnings via `-Xlint:all -Werror`.
+      - Build fails on warnings via `-Xlint:all -Werror`.
+   - Evidence:
+      - `docs/qa/evidence/2026-02-21-ac-gates/compile.log`
 
 6. Deprecated count 0
    - Command:
      - `mvn -q -DskipTests compile`
    - Gate:
-     - Deprecated usage treated as warning and blocked by `-Werror`.
+      - Deprecated usage treated as warning and blocked by `-Werror`.
+   - Evidence:
+      - `docs/qa/evidence/2026-02-21-ac-gates/compile.log`
 
 7. One-day delivery schedule + security verification
     - Schedule artifact:
@@ -52,17 +62,30 @@ This checklist captures mandatory/optional acceptance evidence for current MVP r
       - `REPO_OWNER` (for example: `HYOSUNG-ITX-AI-Business-Department`)
       - `REPO_NAME` (for example: `clearfolio-viewer`)
       - `PR_NUMBER` (target pull request number)
+      - `HEAD_SHA` (target commit SHA)
     - Security verification commands:
-      - `semgrep --config auto --error --json --output target/semgrep.json src/main/java`
+      - `semgrep --config auto --metrics=off --error --json --output docs/qa/evidence/<run-id>/semgrep.json src/main/java`
       - `gh api "/repos/${REPO_OWNER}/${REPO_NAME}/code-scanning/analyses?pr=${PR_NUMBER}"`
       - `gh api "/repos/${REPO_OWNER}/${REPO_NAME}/code-scanning/alerts?pr=${PR_NUMBER}&state=open"`
+      - `gh pr checks ${PR_NUMBER} --required > docs/qa/evidence/<run-id>/gh-required-checks.txt`
+      - `gh pr view ${PR_NUMBER} --json mergeStateStatus,mergeable,reviewDecision,url,headRefOid,baseRefName > docs/qa/evidence/<run-id>/gh-merge-state.json`
+      - `gh api "/repos/${REPO_OWNER}/${REPO_NAME}/commits/${HEAD_SHA}/check-runs"`
     - Gate:
       - Security command outputs are recorded and attached to PR evidence comment before delivery decision.
+    - Evidence:
+      - `docs/qa/evidence/2026-02-21-ac-gates/semgrep.json`
+      - `docs/qa/evidence/2026-02-21-ac-gates/gh-code-scanning-analyses.json`
+      - `docs/qa/evidence/2026-02-21-ac-gates/gh-code-scanning-alerts-open.json`
+      - `docs/qa/evidence/2026-02-21-ac-gates/gh-check-runs.json`
+      - `docs/qa/evidence/2026-02-21-ac-gates/gh-required-checks.txt`
+      - `docs/qa/evidence/2026-02-21-ac-gates/gh-merge-state.json`
 
 ## Optional tracks
 
 1. Client DB pooler (when DB path is enabled)
    - Confirm detection/fallback logic and read-only route policy.
+   - Current status: not executed (no persistent DB introduced in MVP).
 
 2. PostgreSQL 17
    - Integration validation against PostgreSQL 17 before production enablement.
+   - Current status: not executed (no persistent DB introduced in MVP).

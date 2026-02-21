@@ -41,6 +41,10 @@ an asynchronous conversion simulation for early pattern validation.
   and one-day delivery schedule with security verification evidence.
 - Optional: DB pooler client path (when DB is introduced), PostgreSQL 17 support track.
 
+Current release claim boundary:
+- Mandatory gates are validated through committed evidence under `docs/qa/evidence/`.
+- Optional DB pooler/PostgreSQL 17 tracks are documented only and not executed in this MVP release.
+
 ## Delivery schedule
 
 - One-day customer delivery plan (including security verification):
