@@ -2,7 +2,7 @@
 
 - generated_at: 2026-02-21
 - runner: local CLI + GitHub API
-- head_sha: `cebe6387c9329baa768fbdf351e3c6074036e136`
+- head_sha: `5e950e4ea4de2d4b0f64279c9b9e44d1d3d953fc`
 - pr_url: `https://github.com/seonghobae/clearfolio/pull/4`
 - Coverage: `line_missed=0`, `branch_missed=0` (`jacoco.csv`)
 - Tests: `Tests run: 116, Failures: 0, Errors: 0, Skipped: 0` (`test.log`)
@@ -10,7 +10,7 @@
 - JavaDoc gate: PASS (`javadoc-status.txt`)
 - Markdown lint: PASS (`markdownlint.log`)
 - Semgrep: `0` findings (`semgrep.json`)
-- Code scanning analyses for PR: `3` (`gh-code-scanning-analyses.json`)
+- Code scanning analyses for PR: `4` (`gh-code-scanning-analyses.json`)
 - Code scanning open alerts for PR: `0` (`gh-code-scanning-alerts-open.json`)
 - PR merge state: `mergeStateStatus=BLOCKED`, `mergeable=MERGEABLE`, `reviewDecision=CHANGES_REQUESTED` (`gh-merge-state.json`)
 - PR checks snapshot: see `gh-all-checks.txt`; required-check snapshot: `gh-required-checks.txt`
@@ -19,4 +19,4 @@
 ## Notes
 
 - Docker/compose assets are not present in this repo, so smoke validation used local JVM fallback per runbook policy.
-- Current merge block reason is review policy (`required_approving_review_count=1`) and active robot review state (`CHANGES_REQUESTED`/pending re-review).
+- Current merge block reason is review policy (`required_approving_review_count=1`) with latest robot decision still `CHANGES_REQUESTED`.

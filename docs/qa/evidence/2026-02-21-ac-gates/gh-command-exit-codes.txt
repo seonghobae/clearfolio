@@ -1,2 +1,2 @@
 gh_required_exit=1
-gh_all_exit=8
+gh_all_exit=0
