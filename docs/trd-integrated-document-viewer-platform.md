@@ -112,9 +112,9 @@ Canonical policy and evidence mapping: `docs/engineering/acceptance-criteria.md`
 - Controller tests assert 202 submit, unsupported format mapping, status/not-found behavior, and `/viewer/{docId}` state-gated behavior.
 - Health endpoint test asserts operational readiness payload.
 - Next required checks for TRD completion before Pattern B gate:
-- Add smoke test command and smoke compose artifacts when containerized runtime is introduced.
-- Add API-level integration tests for malformed names and oversized payloads (service validation coverage is now added in unit tests).
-- Add API test evidence for error-schema consistency once auth/error tracing is added.
+  - Add smoke test command and smoke compose artifacts when containerized runtime is introduced.
+  - Add API-level integration tests for malformed names and oversized payloads (service validation coverage is now added in unit tests).
+  - Add API test evidence for error-schema consistency once auth/error tracing is added.
 
 ## 9) File-level evidence pointers
 
@@ -132,7 +132,7 @@ Canonical policy and evidence mapping: `docs/engineering/acceptance-criteria.md`
 | `spring-projects/spring-framework` | Apache-2.0 | Implemented (WebFlux API runtime) | Non-blocking model scales well but requires strict thread/IO discipline. |
 | `reactor/reactor-core` | Apache-2.0 | Implemented | Strong reactive composition, with higher operator learning curve. |
 | `apache/tika` | Apache-2.0 | Implemented | Convenient file-type support, but larger parser dependency surface. |
-| `jodconverter/jodconverter` | Concept-only (license/legal clarity pending in this repo) | Not integrated | Potential conversion bridge candidate, pending legal/package approval. |
+| `jodconverter/jodconverter` | Concept-only (license/legal clarity pending in this repo) | Not integrated | Tracked in legal/license issue #5; requires legal/package approval before integration. |
 
 ## 11) Architecture source of truth
 

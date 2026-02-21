@@ -42,6 +42,7 @@ Detailed timeline and command set: `docs/plans/2026-02-20-24h-customer-delivery-
 mvn -q -DskipTests compile
 mvn test
 mvn -q -DskipTests javadoc:javadoc
+markdownlint-cli2 "docs/**/*.md" > "docs/qa/evidence/<run-id>/markdownlint.log"
 semgrep --config auto --metrics=off --error --json --output docs/qa/evidence/<run-id>/semgrep.json src/main/java
 ```
 

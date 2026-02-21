@@ -58,6 +58,19 @@ class InMemoryMultipartFileTest {
     }
 
     @Test
+    void transferToPathWritesContent() throws IOException {
+        InMemoryMultipartFile file = new InMemoryMultipartFile("file", "report.docx", null, "payload".getBytes());
+        Path target = Files.createTempFile("in-memory-multipart-path", ".bin");
+
+        try {
+            file.transferTo(target);
+            assertEquals("payload", Files.readString(target));
+        } finally {
+            Files.deleteIfExists(target);
+        }
+    }
+
+    @Test
     void supportsNullContentAsEmptyPayload() {
         InMemoryMultipartFile file = new InMemoryMultipartFile("file", "report.docx", null, null);
 

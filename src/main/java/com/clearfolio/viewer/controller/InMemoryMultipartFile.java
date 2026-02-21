@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -71,11 +72,16 @@ public final class InMemoryMultipartFile implements MultipartFile {
 
     @Override
     public InputStream getInputStream() {
-        return new ByteArrayInputStream(content);
+        return new ByteArrayInputStream(Arrays.copyOf(content, content.length));
     }
 
     @Override
     public void transferTo(File dest) throws IOException {
-        Files.write(dest.toPath(), content);
+        transferTo(dest.toPath());
+    }
+
+    @Override
+    public void transferTo(Path dest) throws IOException {
+        Files.write(dest, content);
     }
 }

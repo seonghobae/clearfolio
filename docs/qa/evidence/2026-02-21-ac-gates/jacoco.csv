@@ -14,7 +14,7 @@ Clearfolio Viewer,com.clearfolio.viewer.repository,InMemoryConversionJobReposito
 Clearfolio Viewer,com.clearfolio.viewer.repository,ConversionJobRepository.FindOrStoreResult,0,9,0,0,0,1,0,1,0,1
 Clearfolio Viewer,com.clearfolio.viewer,ClearfolioViewerApplication,0,8,0,0,0,3,0,2,0,2
 Clearfolio Viewer,com.clearfolio.viewer.exception,UnsupportedDocumentFormatException,0,24,0,4,0,8,0,5,0,3
-Clearfolio Viewer,com.clearfolio.viewer.controller,ConversionController,0,158,0,12,0,32,0,15,0,9
+Clearfolio Viewer,com.clearfolio.viewer.controller,ConversionController,0,161,0,12,0,33,0,15,0,9
 Clearfolio Viewer,com.clearfolio.viewer.controller,ApiExceptionHandler,0,345,0,34,0,112,0,33,0,16
 Clearfolio Viewer,com.clearfolio.viewer.controller,HealthController,0,7,0,0,0,2,0,2,0,2
-Clearfolio Viewer,com.clearfolio.viewer.controller,InMemoryMultipartFile,0,70,0,4,0,15,0,11,0,9
+Clearfolio Viewer,com.clearfolio.viewer.controller,InMemoryMultipartFile,0,78,0,4,0,17,0,12,0,10

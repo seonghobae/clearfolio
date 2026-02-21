@@ -197,7 +197,7 @@ Reference policy: `docs/engineering/acceptance-criteria.md`.
 | `spring-projects/spring-framework` | Apache-2.0 | Implemented (WebFlux) | Reactive model improves concurrency but needs strict blocking isolation. |
 | `reactor/reactor-core` | Apache-2.0 | Implemented | Strong async composition; operator misuse can reduce readability. |
 | `apache/tika` | Apache-2.0 | Implemented | Broad parsing support, with larger dependency surface. |
-| `jodconverter/jodconverter` | Concept-only (license/legal clarity pending in this repo) | Not implemented | Converter integration option; legal/package governance required first. |
+| `jodconverter/jodconverter` | Concept-only (license/legal clarity pending in this repo) | Not implemented | Tracked in legal/license issue #5; legal/package approval required before adoption. |
 
 ### File-level evidence pointers
 

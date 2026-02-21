@@ -60,6 +60,7 @@ public class ConversionController {
     @PostMapping(value = "/api/v1/convert/jobs", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Mono<ResponseEntity<SubmitConversionResponse>> submit(@RequestPart("file") FilePart file) {
         return DataBufferUtils.join(file.content(), maxInMemorySizeBytes)
+                .doOnDiscard(DataBuffer.class, DataBufferUtils::release)
                 .publishOn(Schedulers.boundedElastic())
                 .map(buffer -> toMultipartFile(file, buffer))
                 .map(conversionService::submit)
