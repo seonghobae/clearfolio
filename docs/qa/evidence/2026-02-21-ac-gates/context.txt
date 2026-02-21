@@ -1,2 +1,2 @@
-head_sha=a29f4adbe3f5b7e3a960105b14fda85c2b41cddd
+head_sha=cebe6387c9329baa768fbdf351e3c6074036e136
 pr_url=https://github.com/seonghobae/clearfolio/pull/4
