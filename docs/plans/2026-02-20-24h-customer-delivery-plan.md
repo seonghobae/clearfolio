@@ -48,3 +48,14 @@ gh api "/repos/${REPO_OWNER}/${REPO_NAME}/code-scanning/alerts?pr=${PR_NUMBER}&s
 - compile/test logs (warning/deprecated count)
 - markdown lint output for updated docs
 - PR checks and merge-state evidence comment
+
+## Execution log (latest)
+
+| Executed at (KST) | Runner | Scope | Result | Artifact |
+|---|---|---|---|---|
+| 2026-02-21 | local CLI | Compile gate (`mvn -q -DskipTests compile`) | PASS | `docs/qa/evidence/2026-02-21-ac-gates/compile.log` |
+| 2026-02-21 | local CLI | Test gate (`mvn test`) | PASS | `docs/qa/evidence/2026-02-21-ac-gates/test.log` |
+| 2026-02-21 | local CLI | Coverage gate (JaCoCo) | PASS (line/branch missed=0) | `docs/qa/evidence/2026-02-21-ac-gates/jacoco.csv` |
+| 2026-02-21 | local CLI | Doc lint gate | PASS | `docs/qa/evidence/2026-02-21-ac-gates/markdownlint.log` |
+| 2026-02-21 | local CLI | SAST (semgrep) | PASS (0 findings) | `docs/qa/evidence/2026-02-21-ac-gates/semgrep.json` |
+| 2026-02-21 | GitHub API | Code scanning alerts (PR) | PASS (open alerts=0) | `docs/qa/evidence/2026-02-21-ac-gates/gh-code-scanning-alerts-open.json` |
