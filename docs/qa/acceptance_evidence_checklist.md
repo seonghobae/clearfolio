@@ -64,9 +64,11 @@ This checklist captures mandatory/optional acceptance evidence for current MVP r
       - `PR_NUMBER` (target pull request number)
       - `HEAD_SHA` (target commit SHA)
     - Security verification commands:
-      - `semgrep --config auto --error --json --output docs/qa/evidence/<run-id>/semgrep.json src/main/java`
+      - `semgrep --config auto --metrics=off --error --json --output docs/qa/evidence/<run-id>/semgrep.json src/main/java`
       - `gh api "/repos/${REPO_OWNER}/${REPO_NAME}/code-scanning/analyses?pr=${PR_NUMBER}"`
       - `gh api "/repos/${REPO_OWNER}/${REPO_NAME}/code-scanning/alerts?pr=${PR_NUMBER}&state=open"`
+      - `gh pr checks ${PR_NUMBER} --required > docs/qa/evidence/<run-id>/gh-required-checks.txt`
+      - `gh pr view ${PR_NUMBER} --json mergeStateStatus,mergeable,reviewDecision,url,headRefOid,baseRefName > docs/qa/evidence/<run-id>/gh-merge-state.json`
       - `gh api "/repos/${REPO_OWNER}/${REPO_NAME}/commits/${HEAD_SHA}/check-runs"`
     - Gate:
       - Security command outputs are recorded and attached to PR evidence comment before delivery decision.

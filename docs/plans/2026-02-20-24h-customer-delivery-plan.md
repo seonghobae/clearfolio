@@ -39,7 +39,7 @@ RUN_ID="<run-id>"
 EVIDENCE_DIR="docs/qa/evidence/${RUN_ID}"
 mkdir -p "${EVIDENCE_DIR}"
 
-semgrep --config auto --error --json --output "${EVIDENCE_DIR}/semgrep.json" src/main/java
+semgrep --config auto --metrics=off --error --json --output "${EVIDENCE_DIR}/semgrep.json" src/main/java
 gh api "/repos/${REPO_OWNER}/${REPO_NAME}/code-scanning/analyses?pr=${PR_NUMBER}"
 gh api "/repos/${REPO_OWNER}/${REPO_NAME}/code-scanning/alerts?pr=${PR_NUMBER}&state=open"
 ```
