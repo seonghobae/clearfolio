@@ -1,2 +1,2 @@
-head_sha=PENDING_POST_COMMIT
-pr_url=PENDING_POST_PR
+head_sha=a29f4adbe3f5b7e3a960105b14fda85c2b41cddd
+pr_url=https://github.com/seonghobae/clearfolio/pull/4
