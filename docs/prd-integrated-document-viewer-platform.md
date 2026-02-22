@@ -134,6 +134,8 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 
 Reference policy: `docs/engineering/acceptance-criteria.md`.
 
+Customer release sign-off requires both passing technical checks and a cleared PR review gate (`mergeStateStatus=CLEAN`).
+
 ### AC detail list
 
 - AC-01: `POST /api/v1/convert/jobs` responds with 202 within the target P95 and no inline conversion execution.
@@ -167,8 +169,8 @@ Reference policy: `docs/engineering/acceptance-criteria.md`.
   - Evidence: `src/main/java/com/clearfolio/viewer/model/ConversionJob.java`.
 - AC-06 **PLANNED**: retry/DLQ and operational audit trail are partially designed, not fully implemented in production-grade form.
   - Evidence: `docs/trd-integrated-document-viewer-platform.md`, `docs/diagrams/submit-flow.md`.
-- AC-07 **PLANNED**: dockerized smoke/test/security/data validation evidence is required before release but not fully completed in this repo state.
-  - Evidence: `docs/qa/smoke_test_plan.md`.
+- AC-07 **PARTIAL (technical checks complete, governance gate pending)**: smoke/test/security/data-validation technical evidence is captured for the current head, and customer release sign-off remains pending until the PR review gate is clear (`mergeStateStatus=CLEAN`).
+  - Evidence: `docs/qa/smoke_test_plan.md`, `docs/qa/evidence/2026-02-21-ac-gates/SUMMARY.md`.
 - AC-08 **PLANNED**: mobile viewer shell states are defined for roadmap and require responsive UI validation before sign-off.
 - AC-09 **IMPLEMENTED**: JaCoCo report is generated with line/branch 100% evidence for current production classes.
   - Evidence: `docs/qa/evidence/2026-02-21-ac-gates/jacoco.csv`.
@@ -182,7 +184,7 @@ Reference policy: `docs/engineering/acceptance-criteria.md`.
   - Evidence: `pom.xml` (`maven-compiler-plugin`, `maven-surefire-plugin`).
 - AC-14 **IMPLEMENTED**: build is configured to fail on deprecated usage warnings.
   - Evidence: `pom.xml` (`-Xlint:all`, `-Werror`).
-- AC-15 **IMPLEMENTED (planning+evidence)**: 24-hour delivery schedule and security verification checkpoints are documented and execution evidence is stored for handoff.
+- AC-15 **PARTIAL (technical checks complete, governance gate pending)**: 24-hour delivery schedule and security verification checkpoints are documented, with execution evidence captured; customer release sign-off remains pending until the PR review gate is clear (`mergeStateStatus=CLEAN`).
   - Evidence: `docs/plans/2026-02-20-24h-customer-delivery-plan.md`, `docs/qa/acceptance_evidence_checklist.md`, `docs/qa/evidence/2026-02-21-ac-gates/SUMMARY.md`.
 
 ### Optional tracks

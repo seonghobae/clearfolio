@@ -52,12 +52,12 @@ Delivery context chain (documented integration target):
 | --- | --- | --- | --- | --- |
 | AC-01 | Submit is non-blocking and returns `202` quickly with `jobId` and status URL | `docs/diagrams/submit-flow.md` | `IMPLEMENTED` | Request path never invokes conversion directly and returns job id immediately. |
 | AC-02 | Workflow supports status transitions for submit/polling (`SUBMITTED`, `PROCESSING`, `SUCCEEDED`, `FAILED`) with retry-exhausted terminal state represented as `FAILED` + `deadLettered=true` | `docs/diagrams/status-flow.md` | `IMPLEMENTED` | `ConversionJob` transitions are reflected by `GET /api/v1/convert/jobs/{jobId}`. |
-| AC-03 | HWP/HWPX blocked by default with exception policy | `docs/diagrams/submit-flow.md`, `docs/diagrams/preview-flow.md` | `IMPLEMENTED` for blocklist, `PLANNED` for exception lane | Blocked extensions return structured 400; exception path is documented as planned integration. |
-| AC-04 | Viewer entrypoint provides stable state-gated bootstrap contract and routes to S2S session orchestration as planned extension | `docs/diagrams/preview-flow.md` | `PLANNED` | Viewer workflow includes stable API contract now; external session bootstrap and token flow remain planned at viewer-path orchestration layer. |
+| AC-03 | Viewer entrypoint provides stable state-gated bootstrap contract and routes to S2S session orchestration as planned extension | `docs/diagrams/preview-flow.md` | `IMPLEMENTED (MVP contract), PLANNED (S2S extension)` | Viewer workflow includes stable API contract now; external session bootstrap and token flow remain planned at viewer-path orchestration layer. |
+| AC-04 | HWP/HWPX blocked by default with exception policy | `docs/diagrams/submit-flow.md`, `docs/diagrams/preview-flow.md` | `IMPLEMENTED` for blocklist, `PLANNED` for exception lane | Blocked extensions return structured 400; exception path is documented as planned integration. |
 | AC-05 | `/viewer/{docId}` path supports state-gated responses | `docs/diagrams/preview-flow.md` | `IMPLEMENTED (MVP)` | `ConversionController#getViewer` returns bootstrap on `SUCCEEDED` and `409` for `SUBMITTED`/`PROCESSING`/`FAILED` (retry-exhausted failures are `deadLettered=true`; aliases `/api/v1/viewer/{docId}`, `/api/v1/convert/viewer/{docId}` also route). |
 | AC-06 | Standardized error schema and trace ID across status + viewer | `docs/diagrams/status-flow.md`, `docs/diagrams/preview-flow.md`, `ConversionController#getViewer` | `IMPLEMENTED (submit/status/viewer)` | `errorCode`, `details`, `message`, `traceId`, and compatibility `code` are returned for 404/409 error paths on viewer endpoint in addition to status/submit. |
 | AC-08 | NUL string sanitization on persistence boundary | `docs/diagrams/submit-flow.md` | `IMPLEMENTED` | `ConversionJob` sanitizes file name/content type/message/resource path at state write points. |
-| AC-09 | Release evidence and smoke/compliance checks complete | `docs/qa/smoke_test_plan.md` | `PLANNED` | Existing smoke plan covers MVP; full AC-09 evidence still pending. |
+| AC-09 | Release evidence and smoke/compliance checks complete | `docs/qa/smoke_test_plan.md`, `docs/qa/evidence/2026-02-21-ac-gates/SUMMARY.md` | `PARTIAL (technical checks complete, governance gate pending)` | Technical checks are captured for current head; customer release sign-off remains pending until PR review gate is clear (`mergeStateStatus=CLEAN`). |
 
 ## 5) Planned backlog from TRD to full platform
 
@@ -87,6 +87,8 @@ Delivery context chain (documented integration target):
 7. 1-day schedule+security verification
 
 Canonical policy and evidence mapping: `docs/engineering/acceptance-criteria.md`.
+
+Customer release sign-off requires both passing technical checks and a cleared PR review gate (`mergeStateStatus=CLEAN`).
 
 ## 6-2) Optional acceptance tracks
 
