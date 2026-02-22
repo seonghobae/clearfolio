@@ -100,7 +100,7 @@ public class DefaultDocumentConversionService implements DocumentConversionServi
             return RetryDeadLetterResult.NOT_FOUND;
         }
 
-        ConversionJob job = existing.orElseThrow();
+        ConversionJob job = existing.get();
         if (!job.retryDeadLetteredToSubmitted(operatorId)) {
             return RetryDeadLetterResult.NOT_ELIGIBLE;
         }
