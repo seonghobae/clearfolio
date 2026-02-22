@@ -20,6 +20,8 @@ import com.clearfolio.viewer.exception.UnsupportedDocumentFormatException;
 
 class DefaultDocumentValidationServiceTest {
 
+    private static final Object SECURITY_PROVIDERS_LOCK = new Object();
+
     @Test
     void rejectsHwpAndHwpxByDefault() {
         ConversionProperties conversionProperties = new ConversionProperties();
@@ -332,24 +334,26 @@ class DefaultDocumentValidationServiceTest {
         conversionProperties.setBlockedExtensions(Set.of("hwp", "hwpx"));
         DefaultDocumentValidationService validationService = new DefaultDocumentValidationService(conversionProperties);
 
-        Provider[] providers = Security.getProviders();
-        for (Provider provider : providers) {
-            Security.removeProvider(provider.getName());
-        }
+        synchronized (SECURITY_PROVIDERS_LOCK) {
+            Provider[] providers = Security.getProviders();
+            for (Provider provider : providers) {
+                Security.removeProvider(provider.getName());
+            }
 
-        try {
-            IllegalStateException ex = assertThrows(
-                    IllegalStateException.class,
-                    () -> validationService.validateOrThrow(
-                            new MockMultipartFile("file", "contract.hwp", "application/octet-stream", new byte[] {1}),
-                            PolicyOverrideRequest.of("true", "token-123", "approver-1")
-                    )
-            );
+            try {
+                IllegalStateException ex = assertThrows(
+                        IllegalStateException.class,
+                        () -> validationService.validateOrThrow(
+                                new MockMultipartFile("file", "contract.hwp", "application/octet-stream", new byte[] {1}),
+                                PolicyOverrideRequest.of("true", "token-123", "approver-1")
+                        )
+                );
 
-            assertEquals("SHA-256 digest unavailable", ex.getMessage());
-        } finally {
-            for (int index = 0; index < providers.length; index++) {
-                Security.insertProviderAt(providers[index], index + 1);
+                assertEquals("SHA-256 digest unavailable", ex.getMessage());
+            } finally {
+                for (int index = 0; index < providers.length; index++) {
+                    Security.insertProviderAt(providers[index], index + 1);
+                }
             }
         }
     }

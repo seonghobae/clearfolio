@@ -27,13 +27,19 @@ sequenceDiagram
     Val-->>Svc: UnsupportedDocumentFormatException
     Svc-->>EH: map unsupported format
     EH-->>C: 400 UNSUPPORTED_FORMAT
-  else extension blocked and override=true + token + approver valid
-    Val-->>Val: audit-safe log(extension, approverId, tokenFingerprint)
-    Val-->>Svc: validation ok
-    Svc->>Repo: findOrStoreByContentHash(job)
-    Svc->>W: enqueue(jobId) when created
-    Svc-->>Ctl: jobId
-    Ctl-->>C: 202 Accepted
+  else extension blocked and override=true
+    alt token/approver valid
+      Val-->>Val: audit-safe log(extension, approverId, tokenFingerprint)
+      Val-->>Svc: validation ok
+      Svc->>Repo: findOrStoreByContentHash(job)
+      Svc->>W: enqueue(jobId) when created
+      Svc-->>Ctl: jobId
+      Ctl-->>C: 202 Accepted
+    else token/approver missing or invalid
+      Val-->>Svc: IllegalArgumentException
+      Svc-->>EH: map bad request
+      EH-->>C: 400 BAD_REQUEST
+    end
   else extension allowed
     Val-->>Svc: validation ok
     Svc->>Repo: findOrStoreByContentHash(job)

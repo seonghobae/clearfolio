@@ -240,4 +240,4 @@ Customer release sign-off requires both passing technical checks and a cleared P
 
 ## Architecture source of truth
 
-- Root map: `ARCHITECTURE.md` (last updated 2026-02-21).
+- Root map: `ARCHITECTURE.md` (last updated 2026-02-22).

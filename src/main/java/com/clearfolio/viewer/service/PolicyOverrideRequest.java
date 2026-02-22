@@ -77,12 +77,23 @@ public final class PolicyOverrideRequest {
         return approverId;
     }
 
+    private static String normalizeHeader(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        return value
+                .replace('\r', '_')
+                .replace('\n', '_')
+                .replace('\t', '_');
+    }
+
     @Override
     public String toString() {
         return "PolicyOverrideRequest{"
-                + "policyOverride='" + policyOverride + '\''
+                + "policyOverride='" + normalizeHeader(policyOverride) + '\''
                 + ", approvalToken='[redacted]'"
-                + ", approverId='" + approverId + '\''
+                + ", approverId='" + normalizeHeader(approverId) + '\''
                 + '}';
     }
 }

@@ -59,7 +59,10 @@ public class DefaultDocumentValidationService implements DocumentValidationServi
             throw new IllegalArgumentException("File extension is required.");
         }
 
-        if (blockedExtensions.contains(extension)) {
+        boolean blockedExtension = blockedExtensions.contains(extension);
+        String overrideApproverIdForAudit = null;
+        String overrideTokenForAudit = null;
+        if (blockedExtension) {
             PolicyOverrideRequest effectiveOverride = overrideRequest == null
                     ? PolicyOverrideRequest.none()
                     : overrideRequest;
@@ -75,17 +78,21 @@ public class DefaultDocumentValidationService implements DocumentValidationServi
                     effectiveOverride.approverId(),
                     PolicyOverrideRequest.APPROVER_ID_HEADER + " is required when policy override is true."
             );
-
-            LOGGER.info(
-                    "Blocked-format override accepted extension={} approverId={} tokenFingerprint={}",
-                    sanitizeForLog(extension),
-                    sanitizeForLog(approverId),
-                    tokenFingerprint(approvalToken)
-            );
+            overrideApproverIdForAudit = approverId;
+            overrideTokenForAudit = approvalToken;
         }
 
         if (file.getSize() > maxUploadSizeBytes) {
             throw new IllegalArgumentException("File is too large.");
+        }
+
+        if (blockedExtension) {
+            LOGGER.info(
+                    "Blocked-format override accepted extension={} approverId={} tokenFingerprint={}",
+                    sanitizeForLog(extension),
+                    sanitizeForLog(overrideApproverIdForAudit),
+                    tokenFingerprint(overrideTokenForAudit)
+            );
         }
     }
 

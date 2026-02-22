@@ -79,6 +79,26 @@ class ViewerBootstrapResponseTest {
     }
 
     @Test
+    void defaultsSourceExtensionAndAdapterForLeadingDotFileName() {
+        ConversionJob job = succeededJob(".gitignore");
+
+        ViewerBootstrapResponse response = ViewerBootstrapResponse.from(job);
+
+        assertEquals("", response.sourceExtension());
+        assertEquals("PDF_JS", response.rendererAdapter());
+    }
+
+    @Test
+    void trimsFilenameBeforeExtractingExtension() {
+        ConversionJob job = succeededJob("  report.docx  ");
+
+        ViewerBootstrapResponse response = ViewerBootstrapResponse.from(job);
+
+        assertEquals("docx", response.sourceExtension());
+        assertEquals("DOCX_PREVIEW", response.rendererAdapter());
+    }
+
+    @Test
     void normalizesSourceExtensionToLowerCase() {
         ConversionJob job = succeededJob("REPORT.DOCX");
 

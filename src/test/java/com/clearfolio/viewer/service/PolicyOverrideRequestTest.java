@@ -58,4 +58,22 @@ class PolicyOverrideRequestTest {
         assertTrue(rendered.contains("approvalToken='[redacted]'"));
         assertTrue(!rendered.contains("secret-token"));
     }
+
+    @Test
+    void toStringNormalizesControlCharactersInPrintableHeaders() {
+        PolicyOverrideRequest request = PolicyOverrideRequest.of("true\n", "secret-token", "approver\r\n1\t");
+
+        String rendered = request.toString();
+
+        assertTrue(rendered.contains("policyOverride='true_'"));
+        assertTrue(rendered.contains("approverId='approver__1_'"));
+    }
+
+    @Test
+    void toStringHandlesNullPrintableHeaders() {
+        String rendered = PolicyOverrideRequest.none().toString();
+
+        assertTrue(rendered.contains("policyOverride='null'"));
+        assertTrue(rendered.contains("approverId='null'"));
+    }
 }

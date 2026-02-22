@@ -142,4 +142,4 @@ Customer release sign-off requires both passing technical checks and a cleared P
 
 ## 11) Architecture source of truth
 
-- Root map: `ARCHITECTURE.md` (last updated 2026-02-21 in this change).
+- Root map: `ARCHITECTURE.md` (last updated 2026-02-22 in this change).
