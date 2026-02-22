@@ -22,6 +22,7 @@ import com.clearfolio.viewer.exception.UnsupportedDocumentFormatException;
 public class DefaultDocumentValidationService implements DocumentValidationService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultDocumentValidationService.class);
+    private static final int FINGERPRINT_TRUNCATE_BYTES = 8;
 
     private final Set<String> blockedExtensions;
     private final long maxUploadSizeBytes;
@@ -139,7 +140,7 @@ public class DefaultDocumentValidationService implements DocumentValidationServi
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hashed = digest.digest(approvalToken.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hashed, 0, 6);
+            return HexFormat.of().formatHex(hashed, 0, FINGERPRINT_TRUNCATE_BYTES);
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 digest unavailable", ex);
         }
