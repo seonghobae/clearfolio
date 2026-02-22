@@ -101,12 +101,13 @@ public class DefaultDocumentValidationService implements DocumentValidationServi
             return "";
         }
 
-        int lastDot = fileName.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == fileName.length() - 1) {
+        String normalized = fileName.strip();
+        int lastDot = normalized.lastIndexOf('.');
+        if (lastDot <= 0 || lastDot == normalized.length() - 1) {
             return "";
         }
 
-        return fileName.substring(lastDot + 1).toLowerCase(Locale.ROOT);
+        return normalized.substring(lastDot + 1).toLowerCase(Locale.ROOT);
     }
 
     private boolean isPolicyOverrideEnabled(String headerValue) {

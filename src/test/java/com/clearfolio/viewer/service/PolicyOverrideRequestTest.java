@@ -1,6 +1,7 @@
 package com.clearfolio.viewer.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -58,7 +59,7 @@ class PolicyOverrideRequestTest {
         String rendered = request.toString();
 
         assertTrue(rendered.contains("approvalToken='[redacted]'"));
-        assertTrue(!rendered.contains("secret-token"));
+        assertFalse(rendered.contains("secret-token"));
     }
 
     @Test

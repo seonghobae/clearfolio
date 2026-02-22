@@ -300,6 +300,38 @@ class DefaultDocumentValidationServiceTest {
     }
 
     @Test
+    void rejectsLeadingDotFilenameAsMissingExtension() {
+        ConversionProperties conversionProperties = new ConversionProperties();
+        conversionProperties.setBlockedExtensions(Set.of("hwp", "hwpx"));
+        DefaultDocumentValidationService validationService = new DefaultDocumentValidationService(conversionProperties);
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> validationService.validateOrThrow(
+                        new MockMultipartFile("file", ".hwp", "application/octet-stream", new byte[] {1})
+                )
+        );
+
+        assertEquals("File extension is required.", ex.getMessage());
+    }
+
+    @Test
+    void trimsFilenameBeforeBlockedExtensionCheck() {
+        ConversionProperties conversionProperties = new ConversionProperties();
+        conversionProperties.setBlockedExtensions(Set.of("hwp", "hwpx"));
+        DefaultDocumentValidationService validationService = new DefaultDocumentValidationService(conversionProperties);
+
+        UnsupportedDocumentFormatException ex = assertThrows(
+                UnsupportedDocumentFormatException.class,
+                () -> validationService.validateOrThrow(
+                        new MockMultipartFile("file", "  contract.hwp  ", "application/octet-stream", new byte[] {1})
+                )
+        );
+
+        assertEquals("hwp", ex.getExtension());
+    }
+
+    @Test
     void handlesNullOverrideRequestByFallingBackToDefaultPolicy() {
         ConversionProperties conversionProperties = new ConversionProperties();
         conversionProperties.setBlockedExtensions(Set.of("hwp", "hwpx"));
