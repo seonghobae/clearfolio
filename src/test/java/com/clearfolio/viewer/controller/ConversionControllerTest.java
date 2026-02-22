@@ -32,6 +32,7 @@ import com.clearfolio.viewer.model.ConversionJob;
 import com.clearfolio.viewer.model.ConversionJobStatus;
 import com.clearfolio.viewer.service.DocumentConversionService;
 import com.clearfolio.viewer.service.PolicyOverrideRequest;
+import com.clearfolio.viewer.service.RetryDeadLetterResult;
 
 class ConversionControllerTest {
 
@@ -245,16 +246,7 @@ class ConversionControllerTest {
     @Test
     void retryReturnsAcceptedWhenDeadLetteredJobIsEligible() {
         UUID jobId = UUID.randomUUID();
-        ConversionJob job = new ConversionJob(
-                jobId,
-                "report.docx",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                "abc",
-                12L
-        );
-        job.markDeadLettered("retries exhausted");
-        when(conversionService.getJob(jobId)).thenReturn(Optional.of(job));
-        when(conversionService.retryDeadLettered(jobId, "operator-7")).thenReturn(true);
+        when(conversionService.retryDeadLettered(jobId, "operator-7")).thenReturn(RetryDeadLetterResult.ACCEPTED);
 
         webTestClient.post()
                 .uri("/api/v1/convert/jobs/{jobId}/retry", jobId)
@@ -303,7 +295,7 @@ class ConversionControllerTest {
     @Test
     void retryReturnsNotFoundWhenJobMissing() {
         UUID jobId = UUID.randomUUID();
-        when(conversionService.getJob(jobId)).thenReturn(Optional.empty());
+        when(conversionService.retryDeadLettered(jobId, "operator-7")).thenReturn(RetryDeadLetterResult.NOT_FOUND);
 
         webTestClient.post()
                 .uri("/api/v1/convert/jobs/{jobId}/retry", jobId)
@@ -320,15 +312,7 @@ class ConversionControllerTest {
     @Test
     void retryReturnsConflictWhenJobIsNotEligible() {
         UUID jobId = UUID.randomUUID();
-        ConversionJob job = new ConversionJob(
-                jobId,
-                "report.docx",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                "abc",
-                12L
-        );
-        when(conversionService.getJob(jobId)).thenReturn(Optional.of(job));
-        when(conversionService.retryDeadLettered(jobId, "operator-7")).thenReturn(false);
+        when(conversionService.retryDeadLettered(jobId, "operator-7")).thenReturn(RetryDeadLetterResult.NOT_ELIGIBLE);
 
         webTestClient.post()
                 .uri("/api/v1/convert/jobs/{jobId}/retry", jobId)

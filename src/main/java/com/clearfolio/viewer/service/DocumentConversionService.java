@@ -43,7 +43,7 @@ public interface DocumentConversionService {
      *
      * @param jobId conversion job identifier
      * @param operatorId operator identifier that triggered the retry
-     * @return true when retry was accepted and enqueued
+     * @return retry outcome
      */
-    boolean retryDeadLettered(UUID jobId, String operatorId);
+    RetryDeadLetterResult retryDeadLettered(UUID jobId, String operatorId);
 }

@@ -26,6 +26,7 @@ import com.clearfolio.viewer.model.ConversionJob;
 import com.clearfolio.viewer.model.ConversionJobStatus;
 import com.clearfolio.viewer.service.DocumentConversionService;
 import com.clearfolio.viewer.service.PolicyOverrideRequest;
+import com.clearfolio.viewer.service.RetryDeadLetterResult;
 
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -125,15 +126,12 @@ public class ConversionController {
             throw new IllegalArgumentException(OPERATOR_ID_HEADER + " header is required.");
         }
 
-        conversionService.getJob(jobId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "job not found"));
-
-        boolean accepted = conversionService.retryDeadLettered(jobId, operatorId.strip());
-        if (!accepted) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "only dead-lettered failed jobs can be retried"
-            );
+        RetryDeadLetterResult retryResult = conversionService.retryDeadLettered(jobId, operatorId.strip());
+        if (retryResult == RetryDeadLetterResult.NOT_FOUND) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "job not found");
+        }
+        if (retryResult == RetryDeadLetterResult.NOT_ELIGIBLE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "only dead-lettered failed jobs can be retried");
         }
 
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(SubmitConversionResponse.accepted(jobId));

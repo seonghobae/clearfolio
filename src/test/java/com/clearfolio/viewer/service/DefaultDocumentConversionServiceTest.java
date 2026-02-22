@@ -1,7 +1,6 @@
 package com.clearfolio.viewer.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -21,6 +20,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -326,9 +326,9 @@ class DefaultDocumentConversionServiceTest {
         job.markDeadLettered("retries exhausted");
         repository.save(job);
 
-        boolean accepted = service.retryDeadLettered(job.getJobId(), "operator-9");
+        RetryDeadLetterResult retryResult = service.retryDeadLettered(job.getJobId(), "operator-9");
 
-        assertTrue(accepted);
+        assertEquals(RetryDeadLetterResult.ACCEPTED, retryResult);
         assertEquals(ConversionJobStatus.SUBMITTED, job.getStatus());
         assertEquals(0, job.getAttemptCount());
         assertTrue(job.getStatusMessage().contains("operator-9"));
@@ -337,7 +337,7 @@ class DefaultDocumentConversionServiceTest {
     }
 
     @Test
-    void retryDeadLetteredReturnsFalseWhenJobMissing() {
+    void retryDeadLetteredReturnsNotFoundWhenJobMissing() {
         ConversionJobRepository repository = new InMemoryConversionJobRepository();
         RecordingConversionWorker worker = new RecordingConversionWorker();
         DocumentConversionService service = new DefaultDocumentConversionService(
@@ -347,14 +347,14 @@ class DefaultDocumentConversionServiceTest {
                 new ConversionProperties()
         );
 
-        boolean accepted = service.retryDeadLettered(UUID.randomUUID(), "operator-9");
+        RetryDeadLetterResult retryResult = service.retryDeadLettered(UUID.randomUUID(), "operator-9");
 
-        assertFalse(accepted);
+        assertEquals(RetryDeadLetterResult.NOT_FOUND, retryResult);
         assertEquals(0, worker.enqueuedCount());
     }
 
     @Test
-    void retryDeadLetteredReturnsFalseWhenJobIsNotDeadLettered() {
+    void retryDeadLetteredReturnsNotEligibleWhenJobIsNotDeadLettered() {
         ConversionJobRepository repository = new InMemoryConversionJobRepository();
         RecordingConversionWorker worker = new RecordingConversionWorker();
         DocumentConversionService service = new DefaultDocumentConversionService(
@@ -374,11 +374,106 @@ class DefaultDocumentConversionServiceTest {
         );
         repository.save(job);
 
-        boolean accepted = service.retryDeadLettered(job.getJobId(), "operator-9");
+        RetryDeadLetterResult retryResult = service.retryDeadLettered(job.getJobId(), "operator-9");
 
-        assertFalse(accepted);
+        assertEquals(RetryDeadLetterResult.NOT_ELIGIBLE, retryResult);
         assertEquals(ConversionJobStatus.SUBMITTED, job.getStatus());
         assertEquals(0, worker.enqueuedCount());
+    }
+
+    @Test
+    void retryDeadLetteredReturnsNotEligibleWhenJobIsProcessing() {
+        ConversionJobRepository repository = new InMemoryConversionJobRepository();
+        RecordingConversionWorker worker = new RecordingConversionWorker();
+        DocumentConversionService service = new DefaultDocumentConversionService(
+                repository,
+                new DefaultDocumentValidationService(new ConversionProperties()),
+                worker,
+                new ConversionProperties()
+        );
+
+        ConversionJob job = new ConversionJob(
+                UUID.randomUUID(),
+                "contract.docx",
+                "application/octet-stream",
+                "hash-processing",
+                1L,
+                3
+        );
+        assertTrue(job.markProcessing("already processing"));
+        repository.save(job);
+
+        RetryDeadLetterResult retryResult = service.retryDeadLettered(job.getJobId(), "operator-9");
+
+        assertEquals(RetryDeadLetterResult.NOT_ELIGIBLE, retryResult);
+        assertEquals(ConversionJobStatus.PROCESSING, job.getStatus());
+        assertEquals(0, worker.enqueuedCount());
+    }
+
+    @Test
+    void retryDeadLetteredConcurrentAttemptsAcceptExactlyOneAndEnqueueOnce() throws Exception {
+        ConversionJobRepository repository = new InMemoryConversionJobRepository();
+        RecordingConversionWorker worker = new RecordingConversionWorker();
+        DocumentConversionService service = new DefaultDocumentConversionService(
+                repository,
+                new DefaultDocumentValidationService(new ConversionProperties()),
+                worker,
+                new ConversionProperties()
+        );
+
+        ConversionJob job = new ConversionJob(
+                UUID.randomUUID(),
+                "contract.docx",
+                "application/octet-stream",
+                "hash-concurrent-retry",
+                1L,
+                3
+        );
+        assertTrue(job.markProcessing("first attempt"));
+        job.markDeadLettered("retries exhausted");
+        repository.save(job);
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        Callable<RetryDeadLetterResult> retryTask = () -> {
+            ready.countDown();
+            if (!start.await(1, TimeUnit.SECONDS)) {
+                throw new AssertionError("retry race setup timed out");
+            }
+            return service.retryDeadLettered(job.getJobId(), "operator-9");
+        };
+
+        Future<RetryDeadLetterResult> first = executor.submit(retryTask);
+        Future<RetryDeadLetterResult> second = executor.submit(retryTask);
+
+        assertTrue(ready.await(1, TimeUnit.SECONDS));
+        start.countDown();
+
+        RetryDeadLetterResult firstResult = first.get();
+        RetryDeadLetterResult secondResult = second.get();
+        executor.shutdownNow();
+        executor.awaitTermination(1, TimeUnit.SECONDS);
+
+        int acceptedCount = 0;
+        int notEligibleCount = 0;
+        if (firstResult == RetryDeadLetterResult.ACCEPTED) {
+            acceptedCount++;
+        }
+        if (secondResult == RetryDeadLetterResult.ACCEPTED) {
+            acceptedCount++;
+        }
+        if (firstResult == RetryDeadLetterResult.NOT_ELIGIBLE) {
+            notEligibleCount++;
+        }
+        if (secondResult == RetryDeadLetterResult.NOT_ELIGIBLE) {
+            notEligibleCount++;
+        }
+
+        assertEquals(1, acceptedCount);
+        assertEquals(1, notEligibleCount);
+        assertEquals(1, worker.enqueuedCount());
+        assertEquals(job.getJobId(), worker.lastEnqueuedJobId());
     }
 
     @Test

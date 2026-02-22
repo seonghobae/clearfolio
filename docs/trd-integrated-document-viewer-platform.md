@@ -18,7 +18,6 @@
 
 This TRD captures the technical scope that is implemented in this repository today and the required gap work before Pattern B production hardening.
 
-- **Implemented now (MVP scope):** non-blocking submit/status pipeline on WebFlux runtime, SHA-256 based dedupe, bounded async worker simulation, health endpoint, NUL removal at persistence boundary, blocked extension guard for `hwp` and `hwpx`, explicit policy-override exception lane with audit signal, deterministic viewer adapter metadata, and configuration-driven tuning.
 - **Implemented now (MVP scope):** non-blocking submit/status pipeline on WebFlux runtime, SHA-256 based dedupe, bounded async worker simulation, health endpoint, NUL removal at persistence boundary, blocked extension guard for `hwp` and `hwpx`, explicit policy-override exception lane with audit signal, deterministic viewer adapter metadata, dead-letter operator retry endpoint (`POST /api/v1/convert/jobs/{jobId}/retry`), and configuration-driven tuning.
 - **Explicitly deferred:** persistent DB migrations, durable queue substitution, real converter/container runtime, artifact store, signed download links, admin APIs, observability/metrics stack, and full RBAC/security gate integrations.
 
@@ -134,7 +133,7 @@ Customer release sign-off requires both passing technical checks and a cleared P
 | `docs/diagrams/submit-policy-adapter-flow.md` | add | Document submit exception lane + viewer adapter mapping path | Align implementation and operations | Keep synchronized with API contract changes |
 | `src/main/java/com/clearfolio/viewer/service/DefaultConversionWorker.java` | edit (existing implementation baseline) | Confirm retry/dead-letter queue behavior | Lightweight queue evidence | In-memory queue only |
 | `src/main/java/com/clearfolio/viewer/controller/ConversionController.java` | edit | Add operator-triggered dead-letter retry endpoint | Close operator recovery gap in MVP contract | Header validation required (`X-Clearfolio-Operator-Id`) |
-| `src/main/java/com/clearfolio/viewer/service/DefaultDocumentConversionService.java` | edit | Add retry orchestration and enqueue behavior | Keep retry out of request thread and preserve queue semantics | Returns false for missing/ineligible jobs |
+| `src/main/java/com/clearfolio/viewer/service/DefaultDocumentConversionService.java` | edit | Add retry orchestration and enqueue behavior | Keep retry out of request thread and preserve queue semantics | Returns explicit retry result for missing/ineligible jobs |
 | `src/main/java/com/clearfolio/viewer/model/ConversionJob.java` | edit | Add dead-letter to submitted transition method | Reset retry state safely for operator recovery | Attempt counter resets for new retry cycle |
 | `docs/diagrams/retry-deadletter-flow.md` | add | Document retry sequence + state transitions | Make retry behavior auditable and reviewable | Must stay aligned with endpoint contract |
 | `docs/qa/evidence/2026-02-21-ac-gates/SUMMARY.md` | edit (existing evidence baseline) | Link latest gate snapshot | Release-traceability baseline | Snapshot must be refreshed per head SHA |

@@ -29,8 +29,8 @@ class ServiceInterfaceDefaultMethodsTest {
             }
 
             @Override
-            public boolean retryDeadLettered(UUID jobId, String operatorId) {
-                return false;
+            public RetryDeadLetterResult retryDeadLettered(UUID jobId, String operatorId) {
+                return RetryDeadLetterResult.NOT_FOUND;
             }
         };
 

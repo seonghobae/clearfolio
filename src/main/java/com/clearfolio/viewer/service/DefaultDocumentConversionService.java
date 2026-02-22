@@ -94,20 +94,20 @@ public class DefaultDocumentConversionService implements DocumentConversionServi
      * {@inheritDoc}
      */
     @Override
-    public boolean retryDeadLettered(UUID jobId, String operatorId) {
+    public RetryDeadLetterResult retryDeadLettered(UUID jobId, String operatorId) {
         Optional<ConversionJob> existing = repository.findById(jobId);
         if (existing.isEmpty()) {
-            return false;
+            return RetryDeadLetterResult.NOT_FOUND;
         }
 
         ConversionJob job = existing.orElseThrow();
         if (!job.retryDeadLetteredToSubmitted(operatorId)) {
-            return false;
+            return RetryDeadLetterResult.NOT_ELIGIBLE;
         }
 
         repository.save(job);
         conversionWorker.enqueue(job.getJobId());
-        return true;
+        return RetryDeadLetterResult.ACCEPTED;
     }
 
     private String contentHash(MultipartFile file) {
