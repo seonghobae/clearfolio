@@ -19,6 +19,7 @@
 This TRD captures the technical scope that is implemented in this repository today and the required gap work before Pattern B production hardening.
 
 - **Implemented now (MVP scope):** non-blocking submit/status pipeline on WebFlux runtime, SHA-256 based dedupe, bounded async worker simulation, health endpoint, NUL removal at persistence boundary, blocked extension guard for `hwp` and `hwpx`, explicit policy-override exception lane with audit signal, deterministic viewer adapter metadata, and configuration-driven tuning.
+- **Implemented now (MVP scope):** non-blocking submit/status pipeline on WebFlux runtime, SHA-256 based dedupe, bounded async worker simulation, health endpoint, NUL removal at persistence boundary, blocked extension guard for `hwp` and `hwpx`, explicit policy-override exception lane with audit signal, deterministic viewer adapter metadata, dead-letter operator retry endpoint (`POST /api/v1/convert/jobs/{jobId}/retry`), and configuration-driven tuning.
 - **Explicitly deferred:** persistent DB migrations, durable queue substitution, real converter/container runtime, artifact store, signed download links, admin APIs, observability/metrics stack, and full RBAC/security gate integrations.
 
 Delivery context chain (documented integration target):
@@ -43,6 +44,7 @@ Delivery context chain (documented integration target):
 | --- | ------ | -------- |
 | `POST /api/v1/convert/jobs` | `POST` `multipart/form-data` | Accepts `file`, validates input, returns 202 immediately with `SubmitConversionResponse { jobId, status, statusUrl }`; optional blocked-format override headers: `X-Clearfolio-Policy-Override`, `X-Clearfolio-Approval-Token`, `X-Clearfolio-Approver-Id` |
 | `GET /api/v1/convert/jobs/{jobId}` | `GET` | Returns `ConversionJobStatusResponse { jobId, fileName, status, message, convertedResourcePath, createdAt, startedAt, completedAt, attemptCount, maxAttempts, retryAt, deadLettered }` if found; 404 otherwise |
+| `POST /api/v1/convert/jobs/{jobId}/retry` | `POST` | Validates `X-Clearfolio-Operator-Id`, re-queues only dead-lettered jobs, returns `202` with `SubmitConversionResponse`; returns `400` (missing operator header), `404` (missing job), `409` (job not eligible) |
 | `GET /healthz` | `GET` | Returns `{ "status": "ok" }` |
 | `GET /viewer/{docId}` (alias: `/api/v1/viewer/{docId}`, `/api/v1/convert/viewer/{docId}`) | `GET` | **Implemented (MVP):** returns `ViewerBootstrapResponse` when job is `SUCCEEDED`; response includes deterministic `sourceExtension` and `rendererAdapter` metadata while preserving existing fields; returns `409 CONFLICT` for `SUBMITTED`/`PROCESSING`/`FAILED` (including retry-exhausted `deadLettered=true`); and `404 NOT_FOUND` when missing. S2S session bootstrap is planned as a post-success extension at the viewer entry path.
 
@@ -58,6 +60,7 @@ Delivery context chain (documented integration target):
 | AC-06 | Standardized error schema and trace ID across status + viewer | `docs/diagrams/status-flow.md`, `docs/diagrams/preview-flow.md`, `ConversionController#getViewer` | `IMPLEMENTED (submit/status/viewer)` | `errorCode`, `details`, `message`, `traceId`, and compatibility `code` are returned for 404/409 error paths on viewer endpoint in addition to status/submit. |
 | AC-08 | NUL string sanitization on persistence boundary | `docs/diagrams/submit-flow.md` | `IMPLEMENTED` | `ConversionJob` sanitizes file name/content type/message/resource path at state write points. |
 | AC-09 | Release evidence and smoke/compliance checks complete | `docs/qa/smoke_test_plan.md`, `docs/qa/evidence/2026-02-21-ac-gates/SUMMARY.md` | `PARTIAL (technical checks complete, governance gate pending)` | Technical checks are captured for current head; customer release sign-off remains pending until PR review gate is clear (`mergeStateStatus=CLEAN`). |
+| AC-16 | Dead-letter operator retry endpoint safely re-queues eligible jobs | `docs/diagrams/retry-deadletter-flow.md`, `src/main/java/com/clearfolio/viewer/controller/ConversionController.java` | `IMPLEMENTED (MVP)` | Retry keeps request path non-blocking and enforces `FAILED + deadLettered=true` eligibility. |
 
 ## 5) Planned backlog from TRD to full platform
 
@@ -112,6 +115,7 @@ Customer release sign-off requires both passing technical checks and a cleared P
 
 - Unit tests assert dedupe idempotency and concurrent duplicate handling.
 - Controller tests assert 202 submit, unsupported format mapping, override-header exception lane behavior, status/not-found behavior, and `/viewer/{docId}` state-gated behavior.
+- Controller tests assert retry endpoint behavior for `202/400/404/409` branches.
 - API tests assert deterministic `sourceExtension` -> `rendererAdapter` mapping in viewer bootstrap response.
 - Health endpoint test asserts operational readiness payload.
 - Next required checks for TRD completion before Pattern B gate:
@@ -129,6 +133,10 @@ Customer release sign-off requires both passing technical checks and a cleared P
 | `src/main/java/com/clearfolio/viewer/api/ViewerBootstrapResponse.java` | edit | Add deterministic adapter metadata for viewer bootstrap | Stable adapter selection across source types | Existing response fields are preserved |
 | `docs/diagrams/submit-policy-adapter-flow.md` | add | Document submit exception lane + viewer adapter mapping path | Align implementation and operations | Keep synchronized with API contract changes |
 | `src/main/java/com/clearfolio/viewer/service/DefaultConversionWorker.java` | edit (existing implementation baseline) | Confirm retry/dead-letter queue behavior | Lightweight queue evidence | In-memory queue only |
+| `src/main/java/com/clearfolio/viewer/controller/ConversionController.java` | edit | Add operator-triggered dead-letter retry endpoint | Close operator recovery gap in MVP contract | Header validation required (`X-Clearfolio-Operator-Id`) |
+| `src/main/java/com/clearfolio/viewer/service/DefaultDocumentConversionService.java` | edit | Add retry orchestration and enqueue behavior | Keep retry out of request thread and preserve queue semantics | Returns false for missing/ineligible jobs |
+| `src/main/java/com/clearfolio/viewer/model/ConversionJob.java` | edit | Add dead-letter to submitted transition method | Reset retry state safely for operator recovery | Attempt counter resets for new retry cycle |
+| `docs/diagrams/retry-deadletter-flow.md` | add | Document retry sequence + state transitions | Make retry behavior auditable and reviewable | Must stay aligned with endpoint contract |
 | `docs/qa/evidence/2026-02-21-ac-gates/SUMMARY.md` | edit (existing evidence baseline) | Link latest gate snapshot | Release-traceability baseline | Snapshot must be refreshed per head SHA |
 
 ## 10) OSS references
@@ -138,7 +146,9 @@ Customer release sign-off requires both passing technical checks and a cleared P
 | `spring-projects/spring-framework` | Apache-2.0 | Implemented (WebFlux API runtime) | Non-blocking model scales well but requires strict thread/IO discipline. |
 | `reactor/reactor-core` | Apache-2.0 | Implemented | Strong reactive composition, with higher operator learning curve. |
 | `apache/tika` | Apache-2.0 | Implemented | Convenient file-type support, but larger parser dependency surface. |
-| `jodconverter/jodconverter` | Concept-only (license/legal clarity pending in this repo) | Not integrated | Tracked in legal/license issue #5; requires legal/package approval before integration. |
+| `jodconverter/jodconverter` | Apache-2.0 | Concept-only | Candidate for future converter runtime integration. |
+| `mozilla/pdf.js` | Apache-2.0 | Concept-only | Target viewer-shell renderer baseline for future frontend integration. |
+| `ONLYOFFICE/DocumentServer` | AGPL-3.0 | Concept-only (do not import) | Architecture reference only because copyleft license is disallowed in this repo. |
 
 ## 11) Architecture source of truth
 

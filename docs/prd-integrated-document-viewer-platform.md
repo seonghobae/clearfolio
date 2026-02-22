@@ -34,6 +34,7 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 
 - `POST /api/v1/convert/jobs` submission endpoint.
 - `GET /api/v1/convert/jobs/{jobId}` status endpoint.
+- `POST /api/v1/convert/jobs/{jobId}/retry` operator endpoint for dead-lettered jobs.
 - `GET /viewer/{docId}` and implemented aliases (`/api/v1/viewer/{docId}`, `/api/v1/convert/viewer/{docId}`).
 - Viewer bootstrap metadata includes deterministic `sourceExtension` and `rendererAdapter` fields without breaking existing keys.
 - Async worker path with states `SUBMITTED`, `PROCESSING`, `SUCCEEDED`, `FAILED`.
@@ -111,6 +112,7 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 - FR-10: Blocklist enforcement and approved-override path must be auditable and explicit.
 - FR-11: Provide mobile shell behavior for `/viewer/{docId}` with no horizontal scroll, touch-first controls, and explicit loading/error states.
 - FR-12: Viewer bootstrap returns deterministic renderer adapter metadata derived from source extension while preserving existing fields for compatibility.
+- FR-13: Operator retry endpoint must accept only dead-lettered failed jobs, return `202` on accepted requeue, `409` for ineligible states, `404` for missing jobs, and `400` for missing operator metadata.
 
 ## 8. Non-Functional Requirements
 
@@ -158,6 +160,7 @@ Customer release sign-off requires both passing technical checks and a cleared P
 - AC-13: Warning count is 0 in verification command outputs.
 - AC-14: Deprecated API usage count is 0 in verification command outputs.
 - AC-15: A one-day (<=24h) customer-delivery schedule is documented and executed with mandatory security verification evidence.
+- AC-16: `POST /api/v1/convert/jobs/{jobId}/retry` re-queues only dead-lettered jobs and keeps conversion execution out of request path.
 
 ### Acceptance Mapping (Current Implementation)
 
@@ -172,8 +175,8 @@ Customer release sign-off requires both passing technical checks and a cleared P
   - Evidence: `src/main/java/com/clearfolio/viewer/service/DefaultDocumentValidationService.java`, `src/main/java/com/clearfolio/viewer/service/PolicyOverrideRequest.java`, `src/test/java/com/clearfolio/viewer/controller/ConversionControllerMultipartLimitTest.java`.
 - AC-05 **IMPLEMENTED**: NUL sanitization is applied at persistence edge for string fields.
   - Evidence: `src/main/java/com/clearfolio/viewer/model/ConversionJob.java`.
-- AC-06 **PLANNED**: retry/DLQ and operational audit trail are partially designed, not fully implemented in production-grade form.
-  - Evidence: `docs/trd-integrated-document-viewer-platform.md`, `docs/diagrams/submit-flow.md`.
+- AC-06 **IMPLEMENTED (MVP operator recovery lane)**: dead-lettered jobs can be operator-requeued through a dedicated endpoint while preserving bounded queue semantics.
+  - Evidence: `src/main/java/com/clearfolio/viewer/controller/ConversionController.java`, `src/main/java/com/clearfolio/viewer/service/DefaultDocumentConversionService.java`, `src/main/java/com/clearfolio/viewer/model/ConversionJob.java`, `docs/diagrams/retry-deadletter-flow.md`.
 - AC-07 **PARTIAL (technical checks complete, governance gate pending)**: smoke/test/security/data-validation technical evidence is captured for the current head, and customer release sign-off remains pending until the PR review gate is clear (`mergeStateStatus=CLEAN`).
   - Evidence: `docs/qa/smoke_test_plan.md`, `docs/qa/evidence/2026-02-21-ac-gates/SUMMARY.md`.
 - AC-08 **PLANNED**: mobile viewer shell states are defined for roadmap and require responsive UI validation before sign-off.
@@ -191,6 +194,8 @@ Customer release sign-off requires both passing technical checks and a cleared P
   - Evidence: `pom.xml` (`-Xlint:all`, `-Werror`).
 - AC-15 **PARTIAL (technical checks complete, governance gate pending)**: 24-hour delivery schedule and security verification checkpoints are documented, with execution evidence captured; customer release sign-off remains pending until the PR review gate is clear (`mergeStateStatus=CLEAN`).
   - Evidence: `docs/plans/2026-02-20-24h-customer-delivery-plan.md`, `docs/qa/acceptance_evidence_checklist.md`, `docs/qa/evidence/2026-02-21-ac-gates/SUMMARY.md`.
+- AC-16 **IMPLEMENTED (MVP operator recovery lane)**: retry endpoint enforces operator header validation and only transitions `FAILED + deadLettered=true` jobs back to queue.
+  - Evidence: `src/main/java/com/clearfolio/viewer/controller/ConversionController.java`, `src/test/java/com/clearfolio/viewer/controller/ConversionControllerTest.java`, `src/test/java/com/clearfolio/viewer/service/DefaultDocumentConversionServiceTest.java`, `src/test/java/com/clearfolio/viewer/model/ConversionJobTest.java`.
 
 ### Optional tracks
 
@@ -204,7 +209,9 @@ Customer release sign-off requires both passing technical checks and a cleared P
 | `spring-projects/spring-framework` | Apache-2.0 | Implemented (WebFlux) | Reactive model improves concurrency but needs strict blocking isolation. |
 | `reactor/reactor-core` | Apache-2.0 | Implemented | Strong async composition; operator misuse can reduce readability. |
 | `apache/tika` | Apache-2.0 | Implemented | Broad parsing support, with larger dependency surface. |
-| `jodconverter/jodconverter` | Concept-only (license/legal clarity pending in this repo) | Not implemented | Tracked in legal/license issue #5; legal/package approval required before adoption. |
+| `jodconverter/jodconverter` | Apache-2.0 | Concept-only | Conversion path candidate for production hardening; not required for current in-memory MVP runtime. |
+| `mozilla/pdf.js` | Apache-2.0 | Concept-only (frontend viewer shell) | Stable PDF viewer baseline for unified shell integration. |
+| `ONLYOFFICE/DocumentServer` | AGPL-3.0 | Concept-only (disallowed for import) | Used as architecture reference only due to copyleft license policy. |
 
 ### File-level evidence pointers
 

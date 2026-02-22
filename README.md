@@ -20,6 +20,7 @@ an asynchronous conversion simulation for early pattern validation.
 - `POST /api/v1/convert/jobs`: upload document and receive async job id.
 - `GET /api/v1/convert/jobs/{jobId}`: poll conversion status and lifecycle fields.
 - `POST /api/v1/convert/jobs` response includes `jobId`, `status`, and `statusUrl`.
+- `POST /api/v1/convert/jobs/{jobId}/retry`: operator-triggered retry for dead-lettered jobs.
 - `GET /viewer/{docId}`: canonical viewer bootstrap entrypoint.
 - `GET /api/v1/viewer/{docId}` and `GET /api/v1/convert/viewer/{docId}`: alias routes for compatibility.
 - Errors follow shared shape (`errorCode`, optional `code`, `message`, `traceId`, `details`) for 404/409/400/500 paths.
@@ -33,6 +34,8 @@ an asynchronous conversion simulation for early pattern validation.
 - Alias endpoints remain stable in behavior and response shape expectations.
 - Dead-letter terminal cases keep `status=FAILED` in API payloads and set
   `deadLettered=true` when retries are exhausted.
+- Dead-lettered jobs can be re-queued by an operator with
+  `X-Clearfolio-Operator-Id` via `/api/v1/convert/jobs/{jobId}/retry`.
 
 ## Acceptance gates (current)
 
@@ -58,6 +61,7 @@ Current release claim boundary:
 - `docs/diagrams/submit-flow.md`
 - `docs/diagrams/status-flow.md`
 - `docs/diagrams/preview-flow.md`
+- `docs/diagrams/retry-deadletter-flow.md`
 
 ## Transfer metadata
 

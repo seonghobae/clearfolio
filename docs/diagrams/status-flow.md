@@ -65,3 +65,10 @@ sequenceDiagram
 - 404 for missing `jobId`.
 - Polling while conversion is running (PROCESSING/SUBMITTED).
 - FAILED status includes stored failure message and retry metadata for UI rendering.
+
+## Operator retry linkage
+
+- Dead-lettered terminal jobs (`status=FAILED`, `deadLettered=true`) can be
+  re-queued via `POST /api/v1/convert/jobs/{jobId}/retry`.
+- Detailed retry sequence and state transitions are documented in
+  `docs/diagrams/retry-deadletter-flow.md`.

@@ -27,6 +27,11 @@ class ServiceInterfaceDefaultMethodsTest {
             public Optional<ConversionJob> getJob(UUID jobId) {
                 return Optional.empty();
             }
+
+            @Override
+            public boolean retryDeadLettered(UUID jobId, String operatorId) {
+                return false;
+            }
         };
 
         UUID actual = service.submit(

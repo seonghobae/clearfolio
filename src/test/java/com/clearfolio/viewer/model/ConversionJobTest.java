@@ -145,6 +145,78 @@ class ConversionJobTest {
     }
 
     @Test
+    void retryDeadLetteredToSubmittedResetsAttemptCountersAndState() {
+        ConversionJob job = new ConversionJob(
+                UUID.randomUUID(),
+                "name.docx",
+                "application/pdf",
+                "hash-operator-retry",
+                1L,
+                2
+        );
+
+        assertTrue(job.markProcessing("start"));
+        assertEquals(1, job.getAttemptCount());
+        job.markDeadLettered("dead-lettered");
+
+        boolean accepted = job.retryDeadLetteredToSubmitted("operator-1");
+
+        assertTrue(accepted);
+        assertEquals(ConversionJobStatus.SUBMITTED, job.getStatus());
+        assertEquals(0, job.getAttemptCount());
+        assertFalse(job.isDeadLettered());
+        assertNull(job.getStartedAt());
+        assertNull(job.getCompletedAt());
+        assertNull(job.getRetryAt());
+        assertNull(job.getConvertedResourcePath());
+        assertEquals("operator retry queued by operator-1", job.getStatusMessage());
+    }
+
+    @Test
+    void retryDeadLetteredToSubmittedRejectsNonDeadLetteredAndSupportsBlankOrNullOperatorId() {
+        ConversionJob nonDeadLettered = new ConversionJob(
+                UUID.randomUUID(),
+                "name.docx",
+                "application/pdf",
+                "hash-non-dead-letter",
+                1L,
+                2
+        );
+
+        assertFalse(nonDeadLettered.retryDeadLetteredToSubmitted("operator-1"));
+        assertEquals(ConversionJobStatus.SUBMITTED, nonDeadLettered.getStatus());
+
+        ConversionJob failedButNotDeadLettered = new ConversionJob(
+                UUID.randomUUID(),
+                "name.docx",
+                "application/pdf",
+                "hash-failed-not-dead-letter",
+                1L,
+                2
+        );
+        failedButNotDeadLettered.markFailed("failed");
+        assertFalse(failedButNotDeadLettered.retryDeadLetteredToSubmitted("operator-1"));
+
+        ConversionJob deadLettered = new ConversionJob(
+                UUID.randomUUID(),
+                "name.docx",
+                "application/pdf",
+                "hash-blank-operator",
+                1L,
+                2
+        );
+        assertTrue(deadLettered.markProcessing("start"));
+        deadLettered.markDeadLettered("dead-lettered");
+
+        assertTrue(deadLettered.retryDeadLetteredToSubmitted("   "));
+        assertEquals("operator retry queued", deadLettered.getStatusMessage());
+
+        deadLettered.markDeadLettered("dead-lettered-again");
+        assertTrue(deadLettered.retryDeadLetteredToSubmitted(null));
+        assertEquals("operator retry queued", deadLettered.getStatusMessage());
+    }
+
+    @Test
     void supportsNullMetadataAndExposesFileSize() {
         ConversionJob job = new ConversionJob(
                 UUID.randomUUID(),

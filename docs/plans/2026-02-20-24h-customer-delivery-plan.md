@@ -27,7 +27,7 @@ Canonical policy reference: `docs/engineering/acceptance-criteria.md`.
 | Time (KST) | Workstream | Output | Verification gate |
 |---|---|---|---|
 | 09:00-10:00 | Contract lock | PRD/TRD/UML/README alignment | doc lint pass |
-| 10:00-12:00 | Core implementation | API + queue + error contract stabilization | `mvn test` pass |
+| 10:00-12:00 | Core implementation | API + queue + error contract stabilization (+ dead-letter retry endpoint) | `mvn test` pass |
 | 12:00-14:00 | Coverage closure | missing line/branch tests added | JaCoCo line/branch 100 |
 | 14:00-15:00 | Docstring closure | JavaDoc on public symbols | docstring audit miss=0 |
 | 15:00-16:00 | Build hygiene | warning/deprecated cleanup | compile warning/deprecated=0 |

@@ -90,6 +90,26 @@ public class DefaultDocumentConversionService implements DocumentConversionServi
         return repository.findById(jobId);
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean retryDeadLettered(UUID jobId, String operatorId) {
+        Optional<ConversionJob> existing = repository.findById(jobId);
+        if (existing.isEmpty()) {
+            return false;
+        }
+
+        ConversionJob job = existing.orElseThrow();
+        if (!job.retryDeadLetteredToSubmitted(operatorId)) {
+            return false;
+        }
+
+        repository.save(job);
+        conversionWorker.enqueue(job.getJobId());
+        return true;
+    }
+
     private String contentHash(MultipartFile file) {
         try (InputStream stream = file.getInputStream()) {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

@@ -13,7 +13,7 @@ This workflow is the operator-facing path for delivering Clearfolio Viewer withi
 
 - S2S chain tracked for handoff: `Clearfolio Viewer <-> internal WAS -> Azure On-premise Gateway -> Power Platform -> mobile/tablet`.
 - Current repo responsibility: Clearfolio Viewer API and non-blocking conversion/status/viewer behavior.
-- MVP increment includes blocked-format policy-exception lane (`X-Clearfolio-Policy-Override` headers) and viewer bootstrap adapter metadata (`sourceExtension`, `rendererAdapter`).
+- MVP increment includes blocked-format policy-exception lane (`X-Clearfolio-Policy-Override` headers), viewer bootstrap adapter metadata (`sourceExtension`, `rendererAdapter`), and dead-letter operator retry lane (`POST /api/v1/convert/jobs/{jobId}/retry`).
 
 ## Mandatory AC list (exact)
 

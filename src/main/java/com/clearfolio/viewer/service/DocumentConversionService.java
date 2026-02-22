@@ -37,4 +37,13 @@ public interface DocumentConversionService {
      * @return conversion job when found
      */
     Optional<ConversionJob> getJob(UUID jobId);
+
+    /**
+     * Retries a dead-lettered conversion job by moving it back to submitted state.
+     *
+     * @param jobId conversion job identifier
+     * @param operatorId operator identifier that triggered the retry
+     * @return true when retry was accepted and enqueued
+     */
+    boolean retryDeadLettered(UUID jobId, String operatorId);
 }

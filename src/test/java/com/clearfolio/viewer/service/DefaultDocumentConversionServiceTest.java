@@ -1,6 +1,7 @@
 package com.clearfolio.viewer.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -34,6 +35,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.clearfolio.viewer.config.ConversionProperties;
 import com.clearfolio.viewer.model.ConversionJob;
+import com.clearfolio.viewer.model.ConversionJobStatus;
 import com.clearfolio.viewer.repository.InMemoryConversionJobRepository;
 import com.clearfolio.viewer.repository.ConversionJobRepository;
 
@@ -302,6 +304,84 @@ class DefaultDocumentConversionServiceTest {
     }
 
     @Test
+    void retryDeadLetteredResetsJobAndEnqueuesWorker() {
+        ConversionJobRepository repository = new InMemoryConversionJobRepository();
+        RecordingConversionWorker worker = new RecordingConversionWorker();
+        DocumentConversionService service = new DefaultDocumentConversionService(
+                repository,
+                new DefaultDocumentValidationService(new ConversionProperties()),
+                worker,
+                new ConversionProperties()
+        );
+
+        ConversionJob job = new ConversionJob(
+                UUID.randomUUID(),
+                "contract.docx",
+                "application/octet-stream",
+                "hash-retry",
+                1L,
+                3
+        );
+        assertTrue(job.markProcessing("first attempt"));
+        job.markDeadLettered("retries exhausted");
+        repository.save(job);
+
+        boolean accepted = service.retryDeadLettered(job.getJobId(), "operator-9");
+
+        assertTrue(accepted);
+        assertEquals(ConversionJobStatus.SUBMITTED, job.getStatus());
+        assertEquals(0, job.getAttemptCount());
+        assertTrue(job.getStatusMessage().contains("operator-9"));
+        assertEquals(1, worker.enqueuedCount());
+        assertEquals(job.getJobId(), worker.lastEnqueuedJobId());
+    }
+
+    @Test
+    void retryDeadLetteredReturnsFalseWhenJobMissing() {
+        ConversionJobRepository repository = new InMemoryConversionJobRepository();
+        RecordingConversionWorker worker = new RecordingConversionWorker();
+        DocumentConversionService service = new DefaultDocumentConversionService(
+                repository,
+                new DefaultDocumentValidationService(new ConversionProperties()),
+                worker,
+                new ConversionProperties()
+        );
+
+        boolean accepted = service.retryDeadLettered(UUID.randomUUID(), "operator-9");
+
+        assertFalse(accepted);
+        assertEquals(0, worker.enqueuedCount());
+    }
+
+    @Test
+    void retryDeadLetteredReturnsFalseWhenJobIsNotDeadLettered() {
+        ConversionJobRepository repository = new InMemoryConversionJobRepository();
+        RecordingConversionWorker worker = new RecordingConversionWorker();
+        DocumentConversionService service = new DefaultDocumentConversionService(
+                repository,
+                new DefaultDocumentValidationService(new ConversionProperties()),
+                worker,
+                new ConversionProperties()
+        );
+
+        ConversionJob job = new ConversionJob(
+                UUID.randomUUID(),
+                "contract.docx",
+                "application/octet-stream",
+                "hash-not-dead-lettered",
+                1L,
+                3
+        );
+        repository.save(job);
+
+        boolean accepted = service.retryDeadLettered(job.getJobId(), "operator-9");
+
+        assertFalse(accepted);
+        assertEquals(ConversionJobStatus.SUBMITTED, job.getStatus());
+        assertEquals(0, worker.enqueuedCount());
+    }
+
+    @Test
     void submitThrowsWhenUploadCannotBeReadForHashing() throws Exception {
         ConversionJobRepository repository = new InMemoryConversionJobRepository();
         RecordingConversionWorker worker = new RecordingConversionWorker();
@@ -360,14 +440,20 @@ class DefaultDocumentConversionServiceTest {
 
     private static class RecordingConversionWorker implements ConversionWorker {
         private final AtomicInteger count = new AtomicInteger();
+        private final AtomicReference<UUID> lastJobId = new AtomicReference<>();
 
         @Override
         public void enqueue(UUID jobId) {
+            lastJobId.set(jobId);
             count.incrementAndGet();
         }
 
         int enqueuedCount() {
             return count.get();
+        }
+
+        UUID lastEnqueuedJobId() {
+            return lastJobId.get();
         }
     }
 

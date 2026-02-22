@@ -243,6 +243,106 @@ class ConversionControllerTest {
     }
 
     @Test
+    void retryReturnsAcceptedWhenDeadLetteredJobIsEligible() {
+        UUID jobId = UUID.randomUUID();
+        ConversionJob job = new ConversionJob(
+                jobId,
+                "report.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "abc",
+                12L
+        );
+        job.markDeadLettered("retries exhausted");
+        when(conversionService.getJob(jobId)).thenReturn(Optional.of(job));
+        when(conversionService.retryDeadLettered(jobId, "operator-7")).thenReturn(true);
+
+        webTestClient.post()
+                .uri("/api/v1/convert/jobs/{jobId}/retry", jobId)
+                .header(ConversionController.OPERATOR_ID_HEADER, "operator-7")
+                .exchange()
+                .expectStatus().isAccepted()
+                .expectBody()
+                .jsonPath("$.jobId").isEqualTo(jobId.toString())
+                .jsonPath("$.status").isEqualTo("ACCEPTED")
+                .jsonPath("$.statusUrl").isEqualTo("/api/v1/convert/jobs/" + jobId);
+
+        verify(conversionService).retryDeadLettered(jobId, "operator-7");
+    }
+
+    @Test
+    void retryReturnsBadRequestWhenOperatorHeaderMissing() {
+        UUID jobId = UUID.randomUUID();
+
+        webTestClient.post()
+                .uri("/api/v1/convert/jobs/{jobId}/retry", jobId)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("BAD_REQUEST")
+                .jsonPath("$.code").isEqualTo("BAD_REQUEST")
+                .jsonPath("$.message").isEqualTo(ConversionController.OPERATOR_ID_HEADER + " header is required.")
+                .jsonPath("$.traceId").value(ConversionControllerTest::assertNonBlankTraceId);
+    }
+
+    @Test
+    void retryReturnsBadRequestWhenOperatorHeaderIsBlank() {
+        UUID jobId = UUID.randomUUID();
+
+        webTestClient.post()
+                .uri("/api/v1/convert/jobs/{jobId}/retry", jobId)
+                .header(ConversionController.OPERATOR_ID_HEADER, "   ")
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("BAD_REQUEST")
+                .jsonPath("$.code").isEqualTo("BAD_REQUEST")
+                .jsonPath("$.message").isEqualTo(ConversionController.OPERATOR_ID_HEADER + " header is required.")
+                .jsonPath("$.traceId").value(ConversionControllerTest::assertNonBlankTraceId);
+    }
+
+    @Test
+    void retryReturnsNotFoundWhenJobMissing() {
+        UUID jobId = UUID.randomUUID();
+        when(conversionService.getJob(jobId)).thenReturn(Optional.empty());
+
+        webTestClient.post()
+                .uri("/api/v1/convert/jobs/{jobId}/retry", jobId)
+                .header(ConversionController.OPERATOR_ID_HEADER, "operator-7")
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("NOT_FOUND")
+                .jsonPath("$.code").isEqualTo("NOT_FOUND")
+                .jsonPath("$.message").isEqualTo("job not found")
+                .jsonPath("$.traceId").value(ConversionControllerTest::assertNonBlankTraceId);
+    }
+
+    @Test
+    void retryReturnsConflictWhenJobIsNotEligible() {
+        UUID jobId = UUID.randomUUID();
+        ConversionJob job = new ConversionJob(
+                jobId,
+                "report.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "abc",
+                12L
+        );
+        when(conversionService.getJob(jobId)).thenReturn(Optional.of(job));
+        when(conversionService.retryDeadLettered(jobId, "operator-7")).thenReturn(false);
+
+        webTestClient.post()
+                .uri("/api/v1/convert/jobs/{jobId}/retry", jobId)
+                .header(ConversionController.OPERATOR_ID_HEADER, "operator-7")
+                .exchange()
+                .expectStatus().isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("CONFLICT")
+                .jsonPath("$.code").isEqualTo("CONFLICT")
+                .jsonPath("$.message").isEqualTo("only dead-lettered failed jobs can be retried")
+                .jsonPath("$.traceId").value(ConversionControllerTest::assertNonBlankTraceId);
+    }
+
+    @Test
     void viewerReturnsConflictForSubmittedStatus() {
         UUID docId = UUID.randomUUID();
         ConversionJob job = new ConversionJob(
