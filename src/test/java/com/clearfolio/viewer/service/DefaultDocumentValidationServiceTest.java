@@ -361,6 +361,18 @@ class DefaultDocumentValidationServiceTest {
     }
 
     @Test
+    void sanitizeForLogReplacesTabCharacter() throws Exception {
+        ConversionProperties conversionProperties = new ConversionProperties();
+        DefaultDocumentValidationService validationService = new DefaultDocumentValidationService(conversionProperties);
+        Method method = DefaultDocumentValidationService.class.getDeclaredMethod("sanitizeForLog", String.class);
+        method.setAccessible(true);
+
+        String sanitized = (String) method.invoke(validationService, "approver\tid");
+
+        assertEquals("approver_id", sanitized);
+    }
+
+    @Test
     void throwsWhenSha256DigestIsUnavailableForOverrideAuditFingerprint() {
         ConversionProperties conversionProperties = new ConversionProperties();
         conversionProperties.setBlockedExtensions(Set.of("hwp", "hwpx"));

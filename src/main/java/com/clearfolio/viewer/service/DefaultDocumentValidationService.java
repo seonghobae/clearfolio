@@ -151,6 +151,7 @@ public class DefaultDocumentValidationService implements DocumentValidationServi
         }
         return value
                 .replace('\u0000', '_')
+                .replace('\t', '_')
                 .replace('\r', '_')
                 .replace('\n', '_')
                 .replace('\u2028', '_')
