@@ -3,7 +3,7 @@
 - Feature: Integrated Document Viewer Platform
 - Version: `0.1.0-mvp`
 - Owner: Product Manager + Platform Team
-- Last updated: `2026-02-20`
+- Last updated: `2026-02-21`
 - Sources:
   - `docs/architecture.md`
   - `docs/prd-integrated-document-viewer-platform.md`
@@ -18,8 +18,13 @@
 
 This TRD captures the technical scope that is implemented in this repository today and the required gap work before Pattern B production hardening.
 
-- **Implemented now (MVP scope):** non-blocking submit/status pipeline, SHA-256 based dedupe, bounded async worker simulation, health endpoint, NUL removal at persistence boundary, blocked extension guard for `hwp` and `hwpx`, and configuration-driven tuning.
+- **Implemented now (MVP scope):** non-blocking submit/status pipeline on WebFlux runtime, SHA-256 based dedupe, bounded async worker simulation, health endpoint, NUL removal at persistence boundary, blocked extension guard for `hwp` and `hwpx`, and configuration-driven tuning.
 - **Explicitly deferred:** persistent DB migrations, durable queue substitution, real converter/container runtime, artifact store, signed download links, admin APIs, observability/metrics stack, and full RBAC/security gate integrations.
+
+Delivery context chain (documented integration target):
+
+- `Clearfolio Viewer <-> internal WAS -> Azure On-premise Gateway -> Power Platform -> mobile/tablet`
+- Current code status: Clearfolio Viewer API behavior in this repository is implemented; internal WAS/gateway/platform orchestration remains planned.
 
 ## 2) Baseline architecture and components
 
@@ -47,12 +52,12 @@ This TRD captures the technical scope that is implemented in this repository tod
 | --- | --- | --- | --- | --- |
 | AC-01 | Submit is non-blocking and returns `202` quickly with `jobId` and status URL | `docs/diagrams/submit-flow.md` | `IMPLEMENTED` | Request path never invokes conversion directly and returns job id immediately. |
 | AC-02 | Workflow supports status transitions for submit/polling (`SUBMITTED`, `PROCESSING`, `SUCCEEDED`, `FAILED`) with retry-exhausted terminal state represented as `FAILED` + `deadLettered=true` | `docs/diagrams/status-flow.md` | `IMPLEMENTED` | `ConversionJob` transitions are reflected by `GET /api/v1/convert/jobs/{jobId}`. |
-| AC-03 | HWP/HWPX blocked by default with exception policy | `docs/diagrams/submit-flow.md`, `docs/diagrams/preview-flow.md` | `IMPLEMENTED` for blocklist, `PLANNED` for exception lane | Blocked extensions return structured 400; exception path is documented as planned integration. |
-| AC-04 | Viewer entrypoint provides stable state-gated bootstrap contract and routes to S2S session orchestration as planned extension | `docs/diagrams/preview-flow.md` | `PLANNED` | Viewer workflow includes stable API contract now; external session bootstrap and token flow remain planned at viewer-path orchestration layer. |
+| AC-03 | Viewer entrypoint provides stable state-gated bootstrap contract and routes to S2S session orchestration as planned extension | `docs/diagrams/preview-flow.md` | `IMPLEMENTED (MVP contract), PLANNED (S2S extension)` | Viewer workflow includes stable API contract now; external session bootstrap and token flow remain planned at viewer-path orchestration layer. |
+| AC-04 | HWP/HWPX blocked by default with exception policy | `docs/diagrams/submit-flow.md`, `docs/diagrams/preview-flow.md` | `IMPLEMENTED` for blocklist, `PLANNED` for exception lane | Blocked extensions return structured 400; exception path is documented as planned integration. |
 | AC-05 | `/viewer/{docId}` path supports state-gated responses | `docs/diagrams/preview-flow.md` | `IMPLEMENTED (MVP)` | `ConversionController#getViewer` returns bootstrap on `SUCCEEDED` and `409` for `SUBMITTED`/`PROCESSING`/`FAILED` (retry-exhausted failures are `deadLettered=true`; aliases `/api/v1/viewer/{docId}`, `/api/v1/convert/viewer/{docId}` also route). |
 | AC-06 | Standardized error schema and trace ID across status + viewer | `docs/diagrams/status-flow.md`, `docs/diagrams/preview-flow.md`, `ConversionController#getViewer` | `IMPLEMENTED (submit/status/viewer)` | `errorCode`, `details`, `message`, `traceId`, and compatibility `code` are returned for 404/409 error paths on viewer endpoint in addition to status/submit. |
 | AC-08 | NUL string sanitization on persistence boundary | `docs/diagrams/submit-flow.md` | `IMPLEMENTED` | `ConversionJob` sanitizes file name/content type/message/resource path at state write points. |
-| AC-09 | Release evidence and smoke/compliance checks complete | `docs/qa/smoke_test_plan.md` | `PLANNED` | Existing smoke plan covers MVP; full AC-09 evidence still pending. |
+| AC-09 | Release evidence and smoke/compliance checks complete | `docs/qa/smoke_test_plan.md`, `docs/qa/evidence/2026-02-21-ac-gates/SUMMARY.md` | `PARTIAL (technical checks complete, governance gate pending)` | Technical checks are captured for current head; customer release sign-off remains pending until PR review gate is clear (`mergeStateStatus=CLEAN`). |
 
 ## 5) Planned backlog from TRD to full platform
 
@@ -73,18 +78,22 @@ This TRD captures the technical scope that is implemented in this repository tod
 
 ## 6-1) Mandatory acceptance gates (current release target)
 
-- **Coverage gate:** 100% line/branch coverage for production classes (`jacoco.csv` evidence).
-- **Docstring gate:** 100% JavaDoc coverage on public production symbols.
-- **Non-blocking web gate:** submit/status/viewer request path does not perform conversion work inline.
-- **Lightweight queue gate:** bounded async executor, retry scheduling, dead-letter terminal path.
-- **Warning gate:** compiler/test verification outputs must be warning-free.
-- **Deprecated gate:** deprecated API usage count must be zero in build verification.
-- **One-day delivery gate:** 24-hour customer-delivery schedule exists and includes mandatory security verification checkpoint completion.
+1. coverage
+2. docstring
+3. non-blocking web
+4. lightweight queue
+5. warning 0
+6. deprecated 0
+7. 1-day schedule+security verification
+
+Canonical policy and evidence mapping: `docs/engineering/acceptance-criteria.md`.
+
+Customer release sign-off requires both passing technical checks and a cleared PR review gate (`mergeStateStatus=CLEAN`).
 
 ## 6-2) Optional acceptance tracks
 
-- **Client DB pooler:** optional PgBouncer/PgCat detection and read-only routing (only when DB is introduced).
-- **PostgreSQL 17:** optional compatibility track with integration verification before enablement.
+- client DB pooler
+- PostgreSQL 17
 
 ## 6-3) One-day customer delivery schedule
 
@@ -106,5 +115,27 @@ This TRD captures the technical scope that is implemented in this repository tod
 - Health endpoint test asserts operational readiness payload.
 - Next required checks for TRD completion before Pattern B gate:
   - Add smoke test command and smoke compose artifacts when containerized runtime is introduced.
-- Add API-level integration tests for malformed names and oversized payloads (service validation coverage is now added in unit tests).
-- Add API test evidence for error-schema consistency once auth/error tracing is added.
+  - Add API-level integration tests for malformed names and oversized payloads (service validation coverage is now added in unit tests).
+  - Add API test evidence for error-schema consistency once auth/error tracing is added.
+
+## 9) File-level evidence pointers
+
+| File | Change(add/edit/delete/move) | Intent(의도) | Why(이유) | Risk/Notes |
+|---|---|---|---|---|
+| `pom.xml` | edit (existing implementation baseline) | Confirm WebFlux dependency/runtime stance | Supports non-blocking web gate evidence | Do not infer Servlet runtime from historical docs |
+| `src/main/java/com/clearfolio/viewer/controller/ConversionController.java` | edit (existing implementation baseline) | Confirm submit/status/viewer contract behavior | AC and API contract evidence | Viewer token orchestration is still planned |
+| `src/main/java/com/clearfolio/viewer/service/DefaultConversionWorker.java` | edit (existing implementation baseline) | Confirm retry/dead-letter queue behavior | Lightweight queue evidence | In-memory queue only |
+| `docs/qa/evidence/2026-02-21-ac-gates/SUMMARY.md` | edit (existing evidence baseline) | Link latest gate snapshot | Release-traceability baseline | Snapshot must be refreshed per head SHA |
+
+## 10) OSS references
+
+| OSS repo | License | Usage status | Trade-off note |
+| --- | --- | --- | --- |
+| `spring-projects/spring-framework` | Apache-2.0 | Implemented (WebFlux API runtime) | Non-blocking model scales well but requires strict thread/IO discipline. |
+| `reactor/reactor-core` | Apache-2.0 | Implemented | Strong reactive composition, with higher operator learning curve. |
+| `apache/tika` | Apache-2.0 | Implemented | Convenient file-type support, but larger parser dependency surface. |
+| `jodconverter/jodconverter` | Concept-only (license/legal clarity pending in this repo) | Not integrated | Tracked in legal/license issue #5; requires legal/package approval before integration. |
+
+## 11) Architecture source of truth
+
+- Root map: `ARCHITECTURE.md` (last updated 2026-02-21 in this change).

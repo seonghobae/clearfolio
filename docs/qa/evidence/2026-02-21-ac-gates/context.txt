@@ -1,2 +1,2 @@
-head_sha=6c504791c4c730449552231525b8008aaac229aa
-pr_url=https://github.com/seonghobae/clearfolio/pull/3
+head_sha=5e950e4ea4de2d4b0f64279c9b9e44d1d3d953fc
+pr_url=https://github.com/seonghobae/clearfolio/pull/4
