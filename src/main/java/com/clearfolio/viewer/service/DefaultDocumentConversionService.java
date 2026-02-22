@@ -51,7 +51,18 @@ public class DefaultDocumentConversionService implements DocumentConversionServi
      */
     @Override
     public UUID submit(MultipartFile file) {
-        validationService.validateOrThrow(file);
+        return submit(file, PolicyOverrideRequest.none());
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public UUID submit(MultipartFile file, PolicyOverrideRequest overrideRequest) {
+        PolicyOverrideRequest effectiveOverride = overrideRequest == null
+                ? PolicyOverrideRequest.none()
+                : overrideRequest;
+        validationService.validateOrThrow(file, effectiveOverride);
 
         String contentHash = contentHash(file);
         ConversionJob job = new ConversionJob(

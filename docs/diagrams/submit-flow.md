@@ -1,8 +1,8 @@
 # Submit Flow UML (component + sequence)
 
-This document covers the upload path for `POST /api/v1/convert/jobs`, including supported-success and exception branches.
+This document covers the upload path for `POST /api/v1/convert/jobs`, including supported-success, blocked-default, and policy-exception branches.
 
-Implementation note: request handling is currently on Spring WebFlux (non-blocking web stance), while conversion work runs in a bounded asynchronous worker queue.
+Implementation note: request handling is currently on Spring WebFlux (non-blocking web stance), while conversion work runs in a bounded asynchronous worker queue. Blocked-format exception lane is implemented via explicit request headers with audit-safe logging.
 
 ## Component diagram
 
@@ -18,7 +18,7 @@ flowchart TB
   Queue[ThreadPoolTaskExecutor\nlightweight bounded queue]
   Worker[ConversionWorker / DefaultConversionWorker]
   ExceptionHandler[ApiExceptionHandler]
-  ExceptionLane[(HWP/HWPX Exception\npolicy lane - planned)]
+  OverrideHeaders[Policy Override Headers\nX-Clearfolio-*]
 
   Client --> WebFlux
   WebFlux --> Controller
@@ -33,10 +33,8 @@ flowchart TB
   Controller --> ExceptionHandler
   Validation --> ExceptionHandler
   Service --> ExceptionHandler
-  ExceptionLane -.-> Service
-
-  classDef planned stroke-dasharray: 4 4,stroke:#808080,color:#808080;
-  class ExceptionLane planned;
+  Client --> OverrideHeaders
+  OverrideHeaders --> Controller
 ```
 
 ## Sequence diagram
@@ -53,9 +51,9 @@ sequenceDiagram
   participant W as ConversionWorker
   participant EH as ApiExceptionHandler
 
-  C->>Ctl: POST /api/v1/convert/jobs (multipart)
-  Ctl->>Svc: submit(file)
-  Svc->>V: validateOrThrow(file)
+  C->>Ctl: POST /api/v1/convert/jobs (multipart + optional X-Clearfolio-* headers)
+  Ctl->>Svc: submit(file, policyOverrideRequest)
+  Svc->>V: validateOrThrow(file, policyOverrideRequest)
 
   alt Empty/missing file
     V-->>Svc: IllegalArgumentException
@@ -64,12 +62,15 @@ sequenceDiagram
 
   else Extension in blocked list (hwp or hwpx)
     V->>P: getBlockedExtensions()
-    V-->>Svc: UnsupportedDocumentFormatException("hwp/hwpx")
-    Svc-->>EH: handleUnsupported
-    EH-->>C: 400 {errorCode: UNSUPPORTED_FORMAT, code: UNSUPPORTED_FORMAT, details.extension}
-    Note right of V: Current behavior rejects by config only.
-    Note right of EH: Planned lane: approved exceptions are raised to
-    manual review queue before rerun.
+    alt Override headers valid
+      V-->>V: validate override=true + token + approver
+      V-->>V: emit audit-safe log(extension, approver, tokenFingerprint)
+      V-->>Svc: validation ok
+    else Override missing/invalid
+      V-->>Svc: UnsupportedDocumentFormatException or IllegalArgumentException
+      Svc-->>EH: handleUnsupported / handleBadRequest
+      EH-->>C: 400 {errorCode, code, details}
+    end
 
   else Validation passes
     V-->>Svc: validation ok
@@ -97,7 +98,9 @@ sequenceDiagram
 
 - Missing or empty file
 - Empty/invalid file name extension
-- HWP/HWPX blocked extension
+- HWP/HWPX blocked extension (default lane)
+- HWP/HWPX approved exception lane with required override headers
+- Invalid override header combinations (missing token/approver or invalid override flag)
 - Hashing failure during submit (mapped to generic server error currently)
 - Duplicate submission reused from canonical hash
 

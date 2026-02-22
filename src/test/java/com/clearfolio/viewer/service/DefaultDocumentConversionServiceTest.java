@@ -26,6 +26,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
@@ -37,6 +38,83 @@ import com.clearfolio.viewer.repository.InMemoryConversionJobRepository;
 import com.clearfolio.viewer.repository.ConversionJobRepository;
 
 class DefaultDocumentConversionServiceTest {
+
+    @Test
+    void submitWithOverrideDelegatesPolicyHeadersToValidationService() {
+        ConversionJobRepository repository = new InMemoryConversionJobRepository();
+        RecordingConversionWorker worker = new RecordingConversionWorker();
+        AtomicReference<PolicyOverrideRequest> capturedOverride = new AtomicReference<>();
+        AtomicInteger validationCallCount = new AtomicInteger();
+        DocumentValidationService validationService = new DocumentValidationService() {
+            @Override
+            public void validateOrThrow(MultipartFile file) {
+            }
+
+            @Override
+            public void validateOrThrow(MultipartFile file, PolicyOverrideRequest overrideRequest) {
+                validationCallCount.incrementAndGet();
+                capturedOverride.set(overrideRequest);
+            }
+        };
+        DocumentConversionService service = new DefaultDocumentConversionService(
+                repository,
+                validationService,
+                worker,
+                new ConversionProperties()
+        );
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "contract.hwp",
+                "application/octet-stream",
+                "hello-viewer".getBytes()
+        );
+
+        UUID jobId = service.submit(file, PolicyOverrideRequest.of("true", "token-123", "approver-1"));
+
+        assertNotEquals(new UUID(0L, 0L), jobId);
+        assertEquals(1, validationCallCount.get());
+        assertEquals("true", capturedOverride.get().policyOverride());
+        assertEquals("token-123", capturedOverride.get().approvalToken());
+        assertEquals("approver-1", capturedOverride.get().approverId());
+        assertEquals(1, worker.enqueuedCount());
+    }
+
+    @Test
+    void submitWithNullOverrideFallsBackToNoneOverride() {
+        ConversionJobRepository repository = new InMemoryConversionJobRepository();
+        RecordingConversionWorker worker = new RecordingConversionWorker();
+        AtomicReference<PolicyOverrideRequest> capturedOverride = new AtomicReference<>();
+        DocumentValidationService validationService = new DocumentValidationService() {
+            @Override
+            public void validateOrThrow(MultipartFile file) {
+            }
+
+            @Override
+            public void validateOrThrow(MultipartFile file, PolicyOverrideRequest overrideRequest) {
+                capturedOverride.set(overrideRequest);
+            }
+        };
+        DocumentConversionService service = new DefaultDocumentConversionService(
+                repository,
+                validationService,
+                worker,
+                new ConversionProperties()
+        );
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "contract.docx",
+                "application/octet-stream",
+                "hello-viewer".getBytes()
+        );
+
+        UUID jobId = service.submit(file, null);
+
+        assertNotEquals(new UUID(0L, 0L), jobId);
+        assertSame(PolicyOverrideRequest.none(), capturedOverride.get());
+        assertEquals(1, worker.enqueuedCount());
+    }
 
     @Test
     void returnsSameJobIdForDuplicatePayloads() {

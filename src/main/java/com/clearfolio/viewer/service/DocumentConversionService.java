@@ -20,6 +20,17 @@ public interface DocumentConversionService {
     UUID submit(MultipartFile file);
 
     /**
+     * Submits an uploaded file for conversion with optional policy-override metadata.
+     *
+     * @param file uploaded file
+     * @param overrideRequest policy-override request headers
+     * @return conversion job identifier
+     */
+    default UUID submit(MultipartFile file, PolicyOverrideRequest overrideRequest) {
+        return submit(file);
+    }
+
+    /**
      * Retrieves a conversion job by identifier.
      *
      * @param jobId conversion job identifier

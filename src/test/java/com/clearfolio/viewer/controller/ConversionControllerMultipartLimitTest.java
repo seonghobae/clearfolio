@@ -13,6 +13,8 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.function.BodyInserters;
 
+import com.clearfolio.viewer.service.PolicyOverrideRequest;
+
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureWebTestClient
 @TestPropertySource(
@@ -62,6 +64,50 @@ class ConversionControllerMultipartLimitTest {
     }
 
     @Test
+    void submitAcceptsBlockedExtensionWhenPolicyOverrideHeadersAreValid() {
+        submit("contract.hwp", "hello".getBytes(), "true", "token-xyz", "approver-99")
+                .expectStatus().isAccepted()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("ACCEPTED")
+                .jsonPath("$.jobId").value(value -> assertContains((String) value, "-"));
+    }
+
+    @Test
+    void submitRejectsBlockedExtensionWhenOverrideTokenIsMissing() {
+        submit("contract.hwp", "hello".getBytes(), "true", " ", "approver-99")
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("BAD_REQUEST")
+                .jsonPath("$.code").isEqualTo("BAD_REQUEST")
+                .jsonPath("$.message").isEqualTo(
+                        "X-Clearfolio-Approval-Token is required when policy override is true.")
+                .jsonPath("$.traceId").value(ConversionControllerMultipartLimitTest::assertNonBlankTraceId);
+    }
+
+    @Test
+    void submitRejectsBlockedExtensionWhenOverrideApproverIsMissing() {
+        submit("contract.hwp", "hello".getBytes(), "true", "token-xyz", " ")
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("BAD_REQUEST")
+                .jsonPath("$.code").isEqualTo("BAD_REQUEST")
+                .jsonPath("$.message").isEqualTo(
+                        "X-Clearfolio-Approver-Id is required when policy override is true.")
+                .jsonPath("$.traceId").value(ConversionControllerMultipartLimitTest::assertNonBlankTraceId);
+    }
+
+    @Test
+    void submitRejectsBlockedExtensionWhenOverrideFlagIsInvalid() {
+        submit("contract.hwp", "hello".getBytes(), "maybe", "token-xyz", "approver-99")
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("BAD_REQUEST")
+                .jsonPath("$.code").isEqualTo("BAD_REQUEST")
+                .jsonPath("$.message").isEqualTo("X-Clearfolio-Policy-Override must be true or false.")
+                .jsonPath("$.traceId").value(ConversionControllerMultipartLimitTest::assertNonBlankTraceId);
+    }
+
+    @Test
     void submitReturnsBadRequestWhenServiceUploadLimitIsExceeded() {
         byte[] payload = new byte[1025];
 
@@ -87,14 +133,34 @@ class ConversionControllerMultipartLimitTest {
     }
 
     private WebTestClient.ResponseSpec submit(String filename, byte[] content) {
+        return submit(filename, content, null, null, null);
+    }
+
+    private WebTestClient.ResponseSpec submit(
+            String filename,
+            byte[] content,
+            String policyOverride,
+            String approvalToken,
+            String approverId) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("file", content)
                 .filename(filename)
                 .contentType(MediaType.APPLICATION_OCTET_STREAM);
 
-        return webTestClient.post()
+        WebTestClient.RequestBodySpec request = webTestClient.post()
                 .uri("/api/v1/convert/jobs")
-                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .contentType(MediaType.MULTIPART_FORM_DATA);
+        if (policyOverride != null) {
+            request.header(PolicyOverrideRequest.POLICY_OVERRIDE_HEADER, policyOverride);
+        }
+        if (approvalToken != null) {
+            request.header(PolicyOverrideRequest.APPROVAL_TOKEN_HEADER, approvalToken);
+        }
+        if (approverId != null) {
+            request.header(PolicyOverrideRequest.APPROVER_ID_HEADER, approverId);
+        }
+
+        return request
                 .body(BodyInserters.fromMultipartData(builder.build()))
                 .exchange();
     }
