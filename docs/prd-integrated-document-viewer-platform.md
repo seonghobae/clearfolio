@@ -1,7 +1,7 @@
 # PRD: Integrated Document Viewer Platform (MVP)
 
 Date: 2026-02-19
-Last updated: 2026-02-21
+Last updated: 2026-02-22
 Owner: Product Manager
 Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.md`, `docs/diagrams/*`
 
@@ -24,6 +24,7 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 - Backend-first implementation that supports the end-to-end concept and contract.
 - Asynchronous conversion orchestration with queue/worker pattern and explicit state transitions.
 - Unified viewer bootstrap contract at `/viewer/{docId}` with safe state handling.
+- Deterministic renderer adapter metadata in viewer bootstrap response.
 - Mobile-ready viewer shell behavior for phone/tablet fallback states.
 - Security and data-cleanliness defaults for initial release.
 
@@ -34,6 +35,7 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 - `POST /api/v1/convert/jobs` submission endpoint.
 - `GET /api/v1/convert/jobs/{jobId}` status endpoint.
 - `GET /viewer/{docId}` and implemented aliases (`/api/v1/viewer/{docId}`, `/api/v1/convert/viewer/{docId}`).
+- Viewer bootstrap metadata includes deterministic `sourceExtension` and `rendererAdapter` fields without breaking existing keys.
 - Async worker path with states `SUBMITTED`, `PROCESSING`, `SUCCEEDED`, `FAILED`.
 - Retry-exhausted terminal failures are represented as `status=FAILED` with `deadLettered=true`.
 - HWP/HWPX block-by-default with approver-traceable exception lane.
@@ -49,6 +51,7 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
   `attemptCount`, `maxAttempts`, `retryAt`, and `deadLettered` in status payload.
 - `GET /viewer/{docId}` is canonical; aliases (`/api/v1/viewer/{docId}` and
   `/api/v1/convert/viewer/{docId}`) behave equivalently.
+- Viewer bootstrap response keeps existing fields and adds deterministic adapter metadata (`sourceExtension`, `rendererAdapter`) from uploaded source extension.
 - Terminal state HTTP semantics are preserved as
   `409` for `SUBMITTED`/`PROCESSING`/`FAILED` (including dead-lettered failures where `deadLettered=true`) and `404` for missing.
 - API compatibility retains both `errorCode` and compatibility `code` where already present.
@@ -73,6 +76,7 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 - Normal lane: accepted format files that are not blocked pass async pipeline and can enter `PROCESSING`.
 - Blocked lane: `hwp`/`hwpx` (and configured blocked extensions) return `400` with structured reason immediately.
 - Exception lane: blocked-format upload can proceed only with explicit approver metadata and policy token retained in audit trail.
+- Exception lane implementation uses request headers (`X-Clearfolio-Policy-Override`, `X-Clearfolio-Approval-Token`, `X-Clearfolio-Approver-Id`) and emits safe audit logs with token fingerprint only.
 - Recovery lane: failed jobs route to retry/DLQ path and can be reprocessed only through operator action.
 
 ## 5. User Stories
@@ -106,6 +110,7 @@ Sources: `docs/architecture.md`, `docs/trd-integrated-document-viewer-platform.m
 - FR-09: Route read traffic to read-only DB endpoint when provided; otherwise safe default to primary.
 - FR-10: Blocklist enforcement and approved-override path must be auditable and explicit.
 - FR-11: Provide mobile shell behavior for `/viewer/{docId}` with no horizontal scroll, touch-first controls, and explicit loading/error states.
+- FR-12: Viewer bootstrap returns deterministic renderer adapter metadata derived from source extension while preserving existing fields for compatibility.
 
 ## 8. Non-Functional Requirements
 
@@ -160,11 +165,11 @@ Customer release sign-off requires both passing technical checks and a cleared P
   - Evidence: `src/main/java/com/clearfolio/viewer/controller/ConversionController.java`, `src/main/java/com/clearfolio/viewer/service/DefaultDocumentConversionService.java`.
 - AC-02 **IMPLEMENTED**: status lifecycle includes `SUBMITTED`, `PROCESSING`, `SUCCEEDED`, `FAILED`, with retry-exhausted terminal state surfaced as `FAILED` + `deadLettered=true`.
   - Evidence: `src/main/java/com/clearfolio/viewer/model/ConversionJobStatus.java`, `docs/diagrams/status-flow.md`.
-- AC-03 **IMPLEMENTED**: `/viewer/{docId}` returns bootstrap on success and `409` for in-progress/failed states (including retry-exhausted `deadLettered=true`).
-  - Evidence: `src/main/java/com/clearfolio/viewer/controller/ConversionController.java`, `src/main/java/com/clearfolio/viewer/api/ViewerBootstrapResponse.java`.
+- AC-03 **IMPLEMENTED**: `/viewer/{docId}` returns bootstrap on success and `409` for in-progress/failed states (including retry-exhausted `deadLettered=true`), with deterministic `sourceExtension`/`rendererAdapter` metadata for viewer adapter selection.
+  - Evidence: `src/main/java/com/clearfolio/viewer/controller/ConversionController.java`, `src/main/java/com/clearfolio/viewer/api/ViewerBootstrapResponse.java`, `src/test/java/com/clearfolio/viewer/api/ViewerBootstrapResponseTest.java`.
   - Updated implementation-equivalent contract keeps terminal retries-exhausted cases in `FAILED` with `deadLettered=true`.
-- AC-04 **PARTIAL**: blocklist for HWP/HWPX is implemented; explicit exception lane is documented but not productionized.
-  - Evidence: `src/main/java/com/clearfolio/viewer/service/DefaultDocumentValidationService.java`, `docs/diagrams/preview-flow.md`.
+- AC-04 **IMPLEMENTED**: blocklist for HWP/HWPX is enforced by default, and explicit exception lane is implemented with auditable override headers.
+  - Evidence: `src/main/java/com/clearfolio/viewer/service/DefaultDocumentValidationService.java`, `src/main/java/com/clearfolio/viewer/service/PolicyOverrideRequest.java`, `src/test/java/com/clearfolio/viewer/controller/ConversionControllerMultipartLimitTest.java`.
 - AC-05 **IMPLEMENTED**: NUL sanitization is applied at persistence edge for string fields.
   - Evidence: `src/main/java/com/clearfolio/viewer/model/ConversionJob.java`.
 - AC-06 **PLANNED**: retry/DLQ and operational audit trail are partially designed, not fully implemented in production-grade form.
@@ -207,6 +212,9 @@ Customer release sign-off requires both passing technical checks and a cleared P
 |---|---|---|---|---|
 | `pom.xml` | edit (existing implementation baseline) | Confirm WebFlux adoption evidence | Supports non-blocking web AC | Do not infer Servlet runtime from old docs |
 | `src/main/java/com/clearfolio/viewer/controller/ConversionController.java` | edit (existing implementation baseline) | Confirm submit/status/viewer contracts | AC-01/02/03/11 evidence | S2S token orchestration is not implemented here |
+| `src/main/java/com/clearfolio/viewer/service/DefaultDocumentValidationService.java` | edit | Implement blocked-format exception lane validation + audit signal | AC-04/07 evidence and auditable policy handling | Token raw values are not logged; fingerprint only |
+| `src/main/java/com/clearfolio/viewer/api/ViewerBootstrapResponse.java` | edit | Add deterministic source-extension adapter metadata | Stable viewer adapter bootstrap for multi-format UX | Backward compatibility preserved by keeping existing fields |
+| `docs/diagrams/submit-policy-adapter-flow.md` | add | Document submit override lane + viewer adapter selection flow | Shared implementation/ops understanding | Keep in sync with controller/service contract changes |
 | `src/main/java/com/clearfolio/viewer/service/DefaultConversionWorker.java` | edit (existing implementation baseline) | Confirm queue, retry, dead-letter behavior | AC-12 evidence | In-memory worker simulation (MVP) |
 | `docs/qa/evidence/2026-02-21-ac-gates/SUMMARY.md` | edit (existing evidence baseline) | Link latest gate outputs | AC-09/13/14/15 traceability | Snapshot tied to specific run |
 

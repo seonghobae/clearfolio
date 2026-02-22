@@ -1,6 +1,6 @@
 # Architecture Map
 
-Last updated: 2026-02-21
+Last updated: 2026-02-22
 
 ## System Purpose
 
@@ -20,13 +20,15 @@ Current state: viewer/state API is implemented in this repository; downstream S2
 - `DefaultDocumentConversionService` (`src/main/java/com/clearfolio/viewer/service/DefaultDocumentConversionService.java`)
   - Validation, content hash generation, dedupe lookup, repository persistence, worker enqueue.
 - `DefaultDocumentValidationService` (`src/main/java/com/clearfolio/viewer/service/DefaultDocumentValidationService.java`)
-  - Enforces extension blocklist and size limits.
+  - Enforces extension blocklist and size limits, including auditable policy-override exception lane.
 - `DefaultConversionWorker` (`src/main/java/com/clearfolio/viewer/service/DefaultConversionWorker.java`)
   - Runs conversion on a bounded executor with retry scheduling and dead-letter fallback.
 - `InMemoryConversionJobRepository` (`src/main/java/com/clearfolio/viewer/repository/InMemoryConversionJobRepository.java`)
   - In-memory job store and content-hash dedupe index.
 - `ConversionJob` (`src/main/java/com/clearfolio/viewer/model/ConversionJob.java`)
   - Domain lifecycle and retry metadata (`attemptCount`, `maxAttempts`, `retryAt`, `deadLettered`).
+- `ViewerBootstrapResponse` (`src/main/java/com/clearfolio/viewer/api/ViewerBootstrapResponse.java`)
+  - Includes deterministic `sourceExtension` and `rendererAdapter` metadata for viewer adapter bootstrap.
 
 ## State Model
 
@@ -63,6 +65,7 @@ Optional tracks:
 - `docs/prd-integrated-document-viewer-platform.md`
 - `docs/trd-integrated-document-viewer-platform.md`
 - `docs/diagrams/submit-flow.md`
+- `docs/diagrams/submit-policy-adapter-flow.md`
 - `docs/diagrams/status-flow.md`
 - `docs/diagrams/preview-flow.md`
 - `docs/engineering/acceptance-criteria.md`

@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.http.codec.multipart.FilePart;
@@ -24,6 +25,7 @@ import com.clearfolio.viewer.api.ViewerBootstrapResponse;
 import com.clearfolio.viewer.model.ConversionJob;
 import com.clearfolio.viewer.model.ConversionJobStatus;
 import com.clearfolio.viewer.service.DocumentConversionService;
+import com.clearfolio.viewer.service.PolicyOverrideRequest;
 
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -55,15 +57,23 @@ public class ConversionController {
      * Submits a file for asynchronous conversion.
      *
      * @param file uploaded source file
+     * @param policyOverride optional blocked-format override toggle header
+     * @param approvalToken optional approval token header used when override is enabled
+     * @param approverId optional approver identifier header used when override is enabled
      * @return accepted response containing the job identifier
      */
     @PostMapping(value = "/api/v1/convert/jobs", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Mono<ResponseEntity<SubmitConversionResponse>> submit(@RequestPart("file") FilePart file) {
+    public Mono<ResponseEntity<SubmitConversionResponse>> submit(
+            @RequestPart("file") FilePart file,
+            @RequestHeader(value = PolicyOverrideRequest.POLICY_OVERRIDE_HEADER, required = false) String policyOverride,
+            @RequestHeader(value = PolicyOverrideRequest.APPROVAL_TOKEN_HEADER, required = false) String approvalToken,
+            @RequestHeader(value = PolicyOverrideRequest.APPROVER_ID_HEADER, required = false) String approverId) {
+        PolicyOverrideRequest overrideRequest = PolicyOverrideRequest.of(policyOverride, approvalToken, approverId);
         return DataBufferUtils.join(file.content(), maxInMemorySizeBytes)
                 .doOnDiscard(DataBuffer.class, DataBufferUtils::release)
                 .publishOn(Schedulers.boundedElastic())
                 .map(buffer -> toMultipartFile(file, buffer))
-                .map(conversionService::submit)
+                .map(uploadedFile -> conversionService.submit(uploadedFile, overrideRequest))
                 .map(jobId -> ResponseEntity.status(HttpStatus.ACCEPTED).body(SubmitConversionResponse.accepted(jobId)));
     }
 

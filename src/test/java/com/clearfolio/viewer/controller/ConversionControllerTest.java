@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -30,6 +31,7 @@ import com.clearfolio.viewer.exception.UnsupportedDocumentFormatException;
 import com.clearfolio.viewer.model.ConversionJob;
 import com.clearfolio.viewer.model.ConversionJobStatus;
 import com.clearfolio.viewer.service.DocumentConversionService;
+import com.clearfolio.viewer.service.PolicyOverrideRequest;
 
 class ConversionControllerTest {
 
@@ -107,7 +109,7 @@ class ConversionControllerTest {
     @Test
     void submitReturnsAcceptedWithJobId() {
         UUID jobId = UUID.randomUUID();
-        when(conversionService.submit(any())).thenReturn(jobId);
+        when(conversionService.submit(any(), any())).thenReturn(jobId);
 
         submit("report.docx", "hello".getBytes())
                 .expectStatus().isAccepted()
@@ -119,7 +121,7 @@ class ConversionControllerTest {
 
     @Test
     void submitReturnsUnsupportedFormatErrorPayload() {
-        when(conversionService.submit(any())).thenThrow(new UnsupportedDocumentFormatException("hwp"));
+        when(conversionService.submit(any(), any())).thenThrow(new UnsupportedDocumentFormatException("hwp"));
 
         submit("contract.hwp", "hello".getBytes())
                 .expectStatus().isBadRequest()
@@ -128,6 +130,26 @@ class ConversionControllerTest {
                 .jsonPath("$.code").isEqualTo("UNSUPPORTED_FORMAT")
                 .jsonPath("$.details.extension").isEqualTo("hwp")
                 .jsonPath("$.traceId").value(ConversionControllerTest::assertNonBlankTraceId);
+    }
+
+    @Test
+    void submitForwardsPolicyOverrideHeadersToService() {
+        UUID jobId = UUID.randomUUID();
+        when(conversionService.submit(any(), any())).thenReturn(jobId);
+
+        submit("contract.hwp", "hello".getBytes(), "true", "token-123", "approver-1")
+                .expectStatus().isAccepted()
+                .expectBody()
+                .jsonPath("$.jobId").isEqualTo(jobId.toString());
+
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<PolicyOverrideRequest> overrideCaptor =
+                org.mockito.ArgumentCaptor.forClass(PolicyOverrideRequest.class);
+        verify(conversionService).submit(any(), overrideCaptor.capture());
+        PolicyOverrideRequest overrideRequest = overrideCaptor.getValue();
+        assertEquals("true", overrideRequest.policyOverride());
+        assertEquals("token-123", overrideRequest.approvalToken());
+        assertEquals("approver-1", overrideRequest.approverId());
     }
 
     @Test
@@ -336,7 +358,9 @@ class ConversionControllerTest {
                 .jsonPath("$.docId").isEqualTo(docId.toString())
                 .jsonPath("$.status").isEqualTo(ConversionJobStatus.SUCCEEDED.name())
                 .jsonPath("$.fileName").isEqualTo("report.docx")
-                .jsonPath("$.previewResourcePath").isEqualTo("/artifacts/report.pdf");
+                .jsonPath("$.previewResourcePath").isEqualTo("/artifacts/report.pdf")
+                .jsonPath("$.sourceExtension").isEqualTo("docx")
+                .jsonPath("$.rendererAdapter").isEqualTo("DOCX_PREVIEW");
     }
 
     @Test
@@ -398,22 +422,44 @@ class ConversionControllerTest {
                     .uri(endpoint, docId)
                     .exchange()
                     .expectStatus().isOk()
-                    .expectBody()
-                    .jsonPath("$.docId").isEqualTo(docId.toString())
-                    .jsonPath("$.status").isEqualTo(ConversionJobStatus.SUCCEEDED.name())
-                    .jsonPath("$.previewResourcePath").isEqualTo("/artifacts/report.pdf");
+                .expectBody()
+                .jsonPath("$.docId").isEqualTo(docId.toString())
+                .jsonPath("$.status").isEqualTo(ConversionJobStatus.SUCCEEDED.name())
+                .jsonPath("$.previewResourcePath").isEqualTo("/artifacts/report.pdf")
+                .jsonPath("$.sourceExtension").isEqualTo("docx")
+                .jsonPath("$.rendererAdapter").isEqualTo("DOCX_PREVIEW");
         }
     }
 
     private WebTestClient.ResponseSpec submit(String filename, byte[] content) {
+        return submit(filename, content, null, null, null);
+    }
+
+    private WebTestClient.ResponseSpec submit(
+            String filename,
+            byte[] content,
+            String policyOverride,
+            String approvalToken,
+            String approverId) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("file", content)
                 .filename(filename)
                 .contentType(MediaType.APPLICATION_OCTET_STREAM);
 
-        return webTestClient.post()
+        WebTestClient.RequestBodySpec request = webTestClient.post()
                 .uri("/api/v1/convert/jobs")
-                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .contentType(MediaType.MULTIPART_FORM_DATA);
+        if (policyOverride != null) {
+            request.header(PolicyOverrideRequest.POLICY_OVERRIDE_HEADER, policyOverride);
+        }
+        if (approvalToken != null) {
+            request.header(PolicyOverrideRequest.APPROVAL_TOKEN_HEADER, approvalToken);
+        }
+        if (approverId != null) {
+            request.header(PolicyOverrideRequest.APPROVER_ID_HEADER, approverId);
+        }
+
+        return request
                 .body(BodyInserters.fromMultipartData(builder.build()))
                 .exchange();
     }

@@ -3,7 +3,7 @@
 - Feature: Integrated Document Viewer Platform
 - Version: `0.1.0-mvp`
 - Owner: Product Manager + Platform Team
-- Last updated: `2026-02-21`
+- Last updated: `2026-02-22`
 - Sources:
   - `docs/architecture.md`
   - `docs/prd-integrated-document-viewer-platform.md`
@@ -18,7 +18,7 @@
 
 This TRD captures the technical scope that is implemented in this repository today and the required gap work before Pattern B production hardening.
 
-- **Implemented now (MVP scope):** non-blocking submit/status pipeline on WebFlux runtime, SHA-256 based dedupe, bounded async worker simulation, health endpoint, NUL removal at persistence boundary, blocked extension guard for `hwp` and `hwpx`, and configuration-driven tuning.
+- **Implemented now (MVP scope):** non-blocking submit/status pipeline on WebFlux runtime, SHA-256 based dedupe, bounded async worker simulation, health endpoint, NUL removal at persistence boundary, blocked extension guard for `hwp` and `hwpx`, explicit policy-override exception lane with audit signal, deterministic viewer adapter metadata, and configuration-driven tuning.
 - **Explicitly deferred:** persistent DB migrations, durable queue substitution, real converter/container runtime, artifact store, signed download links, admin APIs, observability/metrics stack, and full RBAC/security gate integrations.
 
 Delivery context chain (documented integration target):
@@ -30,7 +30,7 @@ Delivery context chain (documented integration target):
 
 - `ConversionController` (`/api/v1/convert`): HTTP ingress for submit/status.
 - `DocumentConversionService` (`DefaultDocumentConversionService`): submit flow with validation, hash calculation, dedupe, repository save, enqueue.
-- `DefaultDocumentValidationService`: extension validation from filename + configurable blocked list.
+- `DefaultDocumentValidationService`: extension validation from filename + configurable blocked list + auditable policy-override exception lane.
 - `InMemoryConversionJobRepository`: canonical dedupe map (`contentHash -> jobId`) plus in-memory job map.
 - `DefaultConversionWorker`: async task dispatch into Spring `TaskExecutor`; simulates conversion delay and writes path/message.
 - `HealthController`: operational health probe endpoint.
@@ -41,10 +41,10 @@ Delivery context chain (documented integration target):
 
 | API | Method | Contract |
 | --- | ------ | -------- |
-| `POST /api/v1/convert/jobs` | `POST` `multipart/form-data` | Accepts `file`, validates input, returns 202 immediately with `SubmitConversionResponse { jobId, status, statusUrl }` |
+| `POST /api/v1/convert/jobs` | `POST` `multipart/form-data` | Accepts `file`, validates input, returns 202 immediately with `SubmitConversionResponse { jobId, status, statusUrl }`; optional blocked-format override headers: `X-Clearfolio-Policy-Override`, `X-Clearfolio-Approval-Token`, `X-Clearfolio-Approver-Id` |
 | `GET /api/v1/convert/jobs/{jobId}` | `GET` | Returns `ConversionJobStatusResponse { jobId, fileName, status, message, convertedResourcePath, createdAt, startedAt, completedAt, attemptCount, maxAttempts, retryAt, deadLettered }` if found; 404 otherwise |
 | `GET /healthz` | `GET` | Returns `{ "status": "ok" }` |
-| `GET /viewer/{docId}` (alias: `/api/v1/viewer/{docId}`, `/api/v1/convert/viewer/{docId}`) | `GET` | **Implemented (MVP):** returns `ViewerBootstrapResponse` when job is `SUCCEEDED`; returns `409 CONFLICT` for `SUBMITTED`/`PROCESSING`/`FAILED` (including retry-exhausted `deadLettered=true`); and `404 NOT_FOUND` when missing. S2S session bootstrap is planned as a post-success extension at the viewer entry path.
+| `GET /viewer/{docId}` (alias: `/api/v1/viewer/{docId}`, `/api/v1/convert/viewer/{docId}`) | `GET` | **Implemented (MVP):** returns `ViewerBootstrapResponse` when job is `SUCCEEDED`; response includes deterministic `sourceExtension` and `rendererAdapter` metadata while preserving existing fields; returns `409 CONFLICT` for `SUBMITTED`/`PROCESSING`/`FAILED` (including retry-exhausted `deadLettered=true`); and `404 NOT_FOUND` when missing. S2S session bootstrap is planned as a post-success extension at the viewer entry path.
 
 ## 4) Technical requirements and implementation mapping
 
@@ -53,7 +53,7 @@ Delivery context chain (documented integration target):
 | AC-01 | Submit is non-blocking and returns `202` quickly with `jobId` and status URL | `docs/diagrams/submit-flow.md` | `IMPLEMENTED` | Request path never invokes conversion directly and returns job id immediately. |
 | AC-02 | Workflow supports status transitions for submit/polling (`SUBMITTED`, `PROCESSING`, `SUCCEEDED`, `FAILED`) with retry-exhausted terminal state represented as `FAILED` + `deadLettered=true` | `docs/diagrams/status-flow.md` | `IMPLEMENTED` | `ConversionJob` transitions are reflected by `GET /api/v1/convert/jobs/{jobId}`. |
 | AC-03 | Viewer entrypoint provides stable state-gated bootstrap contract and routes to S2S session orchestration as planned extension | `docs/diagrams/preview-flow.md` | `IMPLEMENTED (MVP contract), PLANNED (S2S extension)` | Viewer workflow includes stable API contract now; external session bootstrap and token flow remain planned at viewer-path orchestration layer. |
-| AC-04 | HWP/HWPX blocked by default with exception policy | `docs/diagrams/submit-flow.md`, `docs/diagrams/preview-flow.md` | `IMPLEMENTED` for blocklist, `PLANNED` for exception lane | Blocked extensions return structured 400; exception path is documented as planned integration. |
+| AC-04 | HWP/HWPX blocked by default with exception policy | `docs/diagrams/submit-flow.md`, `docs/diagrams/submit-policy-adapter-flow.md` | `IMPLEMENTED` | Blocked extensions return structured 400 by default; explicit override headers (`X-Clearfolio-Policy-Override=true` + non-blank token/approver) allow exception lane and emit safe audit log with token fingerprint. |
 | AC-05 | `/viewer/{docId}` path supports state-gated responses | `docs/diagrams/preview-flow.md` | `IMPLEMENTED (MVP)` | `ConversionController#getViewer` returns bootstrap on `SUCCEEDED` and `409` for `SUBMITTED`/`PROCESSING`/`FAILED` (retry-exhausted failures are `deadLettered=true`; aliases `/api/v1/viewer/{docId}`, `/api/v1/convert/viewer/{docId}` also route). |
 | AC-06 | Standardized error schema and trace ID across status + viewer | `docs/diagrams/status-flow.md`, `docs/diagrams/preview-flow.md`, `ConversionController#getViewer` | `IMPLEMENTED (submit/status/viewer)` | `errorCode`, `details`, `message`, `traceId`, and compatibility `code` are returned for 404/409 error paths on viewer endpoint in addition to status/submit. |
 | AC-08 | NUL string sanitization on persistence boundary | `docs/diagrams/submit-flow.md` | `IMPLEMENTED` | `ConversionJob` sanitizes file name/content type/message/resource path at state write points. |
@@ -111,7 +111,8 @@ Customer release sign-off requires both passing technical checks and a cleared P
 ## 8) Current quality evidence and next checks
 
 - Unit tests assert dedupe idempotency and concurrent duplicate handling.
-- Controller tests assert 202 submit, unsupported format mapping, status/not-found behavior, and `/viewer/{docId}` state-gated behavior.
+- Controller tests assert 202 submit, unsupported format mapping, override-header exception lane behavior, status/not-found behavior, and `/viewer/{docId}` state-gated behavior.
+- API tests assert deterministic `sourceExtension` -> `rendererAdapter` mapping in viewer bootstrap response.
 - Health endpoint test asserts operational readiness payload.
 - Next required checks for TRD completion before Pattern B gate:
   - Add smoke test command and smoke compose artifacts when containerized runtime is introduced.
@@ -124,6 +125,9 @@ Customer release sign-off requires both passing technical checks and a cleared P
 |---|---|---|---|---|
 | `pom.xml` | edit (existing implementation baseline) | Confirm WebFlux dependency/runtime stance | Supports non-blocking web gate evidence | Do not infer Servlet runtime from historical docs |
 | `src/main/java/com/clearfolio/viewer/controller/ConversionController.java` | edit (existing implementation baseline) | Confirm submit/status/viewer contract behavior | AC and API contract evidence | Viewer token orchestration is still planned |
+| `src/main/java/com/clearfolio/viewer/service/DefaultDocumentValidationService.java` | edit | Implement blocked-format policy override lane with audit logging | AC-04 implementation evidence | Logs include token fingerprint only, no raw token |
+| `src/main/java/com/clearfolio/viewer/api/ViewerBootstrapResponse.java` | edit | Add deterministic adapter metadata for viewer bootstrap | Stable adapter selection across source types | Existing response fields are preserved |
+| `docs/diagrams/submit-policy-adapter-flow.md` | add | Document submit exception lane + viewer adapter mapping path | Align implementation and operations | Keep synchronized with API contract changes |
 | `src/main/java/com/clearfolio/viewer/service/DefaultConversionWorker.java` | edit (existing implementation baseline) | Confirm retry/dead-letter queue behavior | Lightweight queue evidence | In-memory queue only |
 | `docs/qa/evidence/2026-02-21-ac-gates/SUMMARY.md` | edit (existing evidence baseline) | Link latest gate snapshot | Release-traceability baseline | Snapshot must be refreshed per head SHA |
 

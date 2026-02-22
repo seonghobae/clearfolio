@@ -12,4 +12,14 @@ public interface DocumentValidationService {
      * @param file uploaded file
      */
     void validateOrThrow(MultipartFile file);
+
+    /**
+     * Validates the uploaded file with optional policy-override metadata.
+     *
+     * @param file uploaded file
+     * @param overrideRequest policy-override request headers
+     */
+    default void validateOrThrow(MultipartFile file, PolicyOverrideRequest overrideRequest) {
+        validateOrThrow(file);
+    }
 }

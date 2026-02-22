@@ -1,6 +1,6 @@
 # Conversion Service Architecture
 
-Last updated: 2026-02-21
+Last updated: 2026-02-22
 
 This repository currently ships an MVP backend for integrated document conversion/viewer entry with a non-blocking web stack.
 
@@ -12,9 +12,9 @@ This repository currently ships an MVP backend for integrated document conversio
 
 ## Runtime flow
 
-- Submit flow (`POST /api/v1/convert/jobs`): validation -> content hash dedupe -> enqueue async conversion -> return `202`.
+- Submit flow (`POST /api/v1/convert/jobs`): validation -> blocked-format policy evaluation (default block, optional auditable override headers) -> content hash dedupe -> enqueue async conversion -> return `202`.
 - Status flow (`GET /api/v1/convert/jobs/{jobId}`): return lifecycle snapshot (`SUBMITTED`, `PROCESSING`, `SUCCEEDED`, `FAILED`) with retry metadata.
-- Preview flow (`GET /viewer/{docId}` and aliases): return bootstrap on `SUCCEEDED`; return `409` for not-ready/failed states; return `404` when missing.
+- Preview flow (`GET /viewer/{docId}` and aliases): return bootstrap on `SUCCEEDED` with deterministic `sourceExtension`/`rendererAdapter`; return `409` for not-ready/failed states; return `404` when missing.
 - Health flow (`GET /healthz`): readiness probe.
 
 ## S2S delivery chain (documented target)
@@ -42,7 +42,7 @@ Reference policy: `docs/engineering/acceptance-criteria.md`.
 ## Component boundaries
 
 - `controller`: HTTP endpoints and exception mapping.
-- `service`: validation, conversion orchestration, worker execution.
+- `service`: validation, policy-override exception lane handling, conversion orchestration, worker execution.
 - `repository`: job persistence abstraction.
 - `model`: lifecycle state and retry/dead-letter metadata.
 - `config`: conversion properties and executor resources.
@@ -72,10 +72,13 @@ Reference policy: `docs/engineering/acceptance-criteria.md`.
 | --- | --- |
 | WebFlux dependency | `pom.xml` |
 | Submit non-blocking controller path | `src/main/java/com/clearfolio/viewer/controller/ConversionController.java` |
+| Blocked-format override lane + audit signal | `src/main/java/com/clearfolio/viewer/service/DefaultDocumentValidationService.java` |
+| Override header contract | `src/main/java/com/clearfolio/viewer/service/PolicyOverrideRequest.java` |
 | Conversion enqueue orchestration | `src/main/java/com/clearfolio/viewer/service/DefaultDocumentConversionService.java` |
 | Worker retry/dead-letter behavior | `src/main/java/com/clearfolio/viewer/service/DefaultConversionWorker.java` |
 | Bounded queue configuration | `src/main/java/com/clearfolio/viewer/config/ConversionExecutorConfig.java` |
 | NUL sanitization at persistence boundary | `src/main/java/com/clearfolio/viewer/model/ConversionJob.java` |
+| Viewer adapter selection metadata | `src/main/java/com/clearfolio/viewer/api/ViewerBootstrapResponse.java` |
 | Mandatory gate evidence index | `docs/qa/evidence/LATEST.md` |
 | Latest gate summary | `docs/qa/evidence/2026-02-21-ac-gates/SUMMARY.md` |
 
@@ -87,3 +90,4 @@ Reference policy: `docs/engineering/acceptance-criteria.md`.
 - `docs/diagrams/submit-flow.md`
 - `docs/diagrams/status-flow.md`
 - `docs/diagrams/preview-flow.md`
+- `docs/diagrams/submit-policy-adapter-flow.md`
