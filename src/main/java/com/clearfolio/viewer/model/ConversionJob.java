@@ -289,6 +289,33 @@ public class ConversionJob {
     }
 
     /**
+     * Re-enables a dead-lettered job by resetting it to submitted state.
+     *
+     * @param operatorId operator identifier that triggered the retry
+     * @return true when the job was dead-lettered and transitioned for retry
+     */
+    public synchronized boolean retryDeadLetteredToSubmitted(String operatorId) {
+        if (status != ConversionJobStatus.FAILED || !deadLettered) {
+            return false;
+        }
+
+        String normalizedOperatorId = sanitize(operatorId);
+        String message = (normalizedOperatorId == null || normalizedOperatorId.isBlank())
+                ? "operator retry queued"
+                : "operator retry queued by " + normalizedOperatorId;
+
+        this.status = ConversionJobStatus.SUBMITTED;
+        this.startedAt = null;
+        this.completedAt = null;
+        this.retryAt = null;
+        this.deadLettered = false;
+        this.attemptCount = 0;
+        this.convertedResourcePath = null;
+        this.statusMessage = message;
+        return true;
+    }
+
+    /**
      * Marks the job as successfully converted.
      *
      * @param convertedResourcePath output resource path

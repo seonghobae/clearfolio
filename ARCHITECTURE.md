@@ -15,6 +15,7 @@ Current state: viewer/state API is implemented in this repository; downstream S2
 
 - `ConversionController` (`src/main/java/com/clearfolio/viewer/controller/ConversionController.java`)
   - `POST /api/v1/convert/jobs`: async submit contract.
+  - `POST /api/v1/convert/jobs/{jobId}/retry`: operator retry for dead-lettered jobs.
   - `GET /api/v1/convert/jobs/{jobId}`: status polling.
   - `GET /viewer/{docId}` (+ aliases): viewer bootstrap/state-gated responses.
 - `DefaultDocumentConversionService` (`src/main/java/com/clearfolio/viewer/service/DefaultDocumentConversionService.java`)
@@ -26,7 +27,7 @@ Current state: viewer/state API is implemented in this repository; downstream S2
 - `InMemoryConversionJobRepository` (`src/main/java/com/clearfolio/viewer/repository/InMemoryConversionJobRepository.java`)
   - In-memory job store and content-hash dedupe index.
 - `ConversionJob` (`src/main/java/com/clearfolio/viewer/model/ConversionJob.java`)
-  - Domain lifecycle and retry metadata (`attemptCount`, `maxAttempts`, `retryAt`, `deadLettered`).
+  - Domain lifecycle and retry metadata (`attemptCount`, `maxAttempts`, `retryAt`, `deadLettered`) plus manual dead-letter retry transition.
 - `ViewerBootstrapResponse` (`src/main/java/com/clearfolio/viewer/api/ViewerBootstrapResponse.java`)
   - Includes deterministic `sourceExtension` and `rendererAdapter` metadata for viewer adapter bootstrap.
 
@@ -68,5 +69,6 @@ Optional tracks:
 - `docs/diagrams/submit-policy-adapter-flow.md`
 - `docs/diagrams/status-flow.md`
 - `docs/diagrams/preview-flow.md`
+- `docs/diagrams/retry-deadletter-flow.md`
 - `docs/engineering/acceptance-criteria.md`
 - `docs/workflow/one-day-delivery-plan.md`

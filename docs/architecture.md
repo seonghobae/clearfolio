@@ -14,6 +14,7 @@ This repository currently ships an MVP backend for integrated document conversio
 
 - Submit flow (`POST /api/v1/convert/jobs`): validation -> blocked-format policy evaluation (default block, optional auditable override headers) -> content hash dedupe -> enqueue async conversion -> return `202`.
 - Status flow (`GET /api/v1/convert/jobs/{jobId}`): return lifecycle snapshot (`SUBMITTED`, `PROCESSING`, `SUCCEEDED`, `FAILED`) with retry metadata.
+- Operator recovery flow (`POST /api/v1/convert/jobs/{jobId}/retry`): validate `X-Clearfolio-Operator-Id` -> allow only dead-lettered jobs -> reset state -> enqueue async conversion -> return `202`.
 - Preview flow (`GET /viewer/{docId}` and aliases): return bootstrap on `SUCCEEDED` with deterministic `sourceExtension`/`rendererAdapter`; return `409` for not-ready/failed states; return `404` when missing.
 - Health flow (`GET /healthz`): readiness probe.
 
@@ -64,7 +65,9 @@ Reference policy: `docs/engineering/acceptance-criteria.md`.
 | `spring-projects/spring-framework` | Apache-2.0 | Implemented (WebFlux runtime) | Strong reactive stack, but requires careful blocking-code isolation. |
 | `reactor/reactor-core` | Apache-2.0 | Implemented (reactive primitives) | Good async composition, but debugging stack traces can be harder than imperative flow. |
 | `apache/tika` | Apache-2.0 | Implemented (document metadata/parsing support) | Broad format support, but parser footprint can increase dependency surface. |
-| `jodconverter/jodconverter` | Concept-only (license/legal review pending in this repo) | Planned concept, not integrated | Useful LibreOffice bridge, but package/image/license governance must be cleared before adoption. |
+| `jodconverter/jodconverter` | Apache-2.0 | Concept-only, not integrated | Useful LibreOffice bridge candidate for production conversion runtime. |
+| `mozilla/pdf.js` | Apache-2.0 | Concept-only frontend reference | Stable PDF rendering baseline for unified viewer shell integration. |
+| `ONLYOFFICE/DocumentServer` | AGPL-3.0 | Concept-only (import disallowed) | Architecture reference only; copyleft policy prevents direct dependency adoption. |
 
 ## Evidence pointers (file-level)
 
@@ -76,6 +79,7 @@ Reference policy: `docs/engineering/acceptance-criteria.md`.
 | Override header contract | `src/main/java/com/clearfolio/viewer/service/PolicyOverrideRequest.java` |
 | Conversion enqueue orchestration | `src/main/java/com/clearfolio/viewer/service/DefaultDocumentConversionService.java` |
 | Worker retry/dead-letter behavior | `src/main/java/com/clearfolio/viewer/service/DefaultConversionWorker.java` |
+| Operator dead-letter retry endpoint | `src/main/java/com/clearfolio/viewer/controller/ConversionController.java` |
 | Bounded queue configuration | `src/main/java/com/clearfolio/viewer/config/ConversionExecutorConfig.java` |
 | NUL sanitization at persistence boundary | `src/main/java/com/clearfolio/viewer/model/ConversionJob.java` |
 | Viewer adapter selection metadata | `src/main/java/com/clearfolio/viewer/api/ViewerBootstrapResponse.java` |
@@ -91,3 +95,4 @@ Reference policy: `docs/engineering/acceptance-criteria.md`.
 - `docs/diagrams/status-flow.md`
 - `docs/diagrams/preview-flow.md`
 - `docs/diagrams/submit-policy-adapter-flow.md`
+- `docs/diagrams/retry-deadletter-flow.md`

@@ -26,6 +26,7 @@ import com.clearfolio.viewer.model.ConversionJob;
 import com.clearfolio.viewer.model.ConversionJobStatus;
 import com.clearfolio.viewer.service.DocumentConversionService;
 import com.clearfolio.viewer.service.PolicyOverrideRequest;
+import com.clearfolio.viewer.service.RetryDeadLetterResult;
 
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -35,6 +36,11 @@ import reactor.core.scheduler.Schedulers;
  */
 @RestController
 public class ConversionController {
+
+    /**
+     * Header used to identify the operator initiating a dead-letter retry.
+     */
+    public static final String OPERATOR_ID_HEADER = "X-Clearfolio-Operator-Id";
 
     private final DocumentConversionService conversionService;
     private final int maxInMemorySizeBytes;
@@ -103,6 +109,32 @@ public class ConversionController {
         ConversionJob job = conversionService.getJob(jobId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "job not found"));
         return ConversionJobStatusResponse.from(job);
+    }
+
+    /**
+     * Retries a dead-lettered conversion job as a new background submission.
+     *
+     * @param jobId conversion job identifier
+     * @param operatorId operator identifier header value
+     * @return accepted response containing the retried job identifier
+     */
+    @PostMapping("/api/v1/convert/jobs/{jobId}/retry")
+    public ResponseEntity<SubmitConversionResponse> retryDeadLettered(
+            @PathVariable UUID jobId,
+            @RequestHeader(value = OPERATOR_ID_HEADER, required = false) String operatorId) {
+        if (operatorId == null || operatorId.isBlank()) {
+            throw new IllegalArgumentException(OPERATOR_ID_HEADER + " header is required.");
+        }
+
+        RetryDeadLetterResult retryResult = conversionService.retryDeadLettered(jobId, operatorId.strip());
+        if (retryResult == RetryDeadLetterResult.NOT_FOUND) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "job not found");
+        }
+        if (retryResult == RetryDeadLetterResult.NOT_ELIGIBLE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "only dead-lettered failed jobs can be retried");
+        }
+
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(SubmitConversionResponse.accepted(jobId));
     }
 
     /**
