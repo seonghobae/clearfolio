@@ -108,6 +108,28 @@ class ConversionControllerTest {
     }
 
     @Test
+    void toMultipartFileCopiesContentTypeHeaderValue() throws Exception {
+        FilePart filePart = mock(FilePart.class);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        when(filePart.headers()).thenReturn(headers);
+        when(filePart.filename()).thenReturn("report.pdf");
+
+        DataBuffer dataBuffer = DefaultDataBufferFactory.sharedInstance.wrap("abc".getBytes());
+        Method method = ConversionController.class.getDeclaredMethod(
+                "toMultipartFile",
+                FilePart.class,
+                DataBuffer.class
+        );
+        method.setAccessible(true);
+
+        InMemoryMultipartFile file = (InMemoryMultipartFile) method.invoke(controller, filePart, dataBuffer);
+
+        assertEquals("application/pdf", file.getContentType());
+        assertEquals("report.pdf", file.getOriginalFilename());
+    }
+
+    @Test
     void submitReturnsAcceptedWithJobId() {
         UUID jobId = UUID.randomUUID();
         when(conversionService.submit(any(), any())).thenReturn(jobId);
@@ -339,7 +361,7 @@ class ConversionControllerTest {
         when(conversionService.getJob(docId)).thenReturn(Optional.of(job));
 
         webTestClient.get()
-                .uri("/viewer/{docId}", docId)
+                .uri("/api/v1/viewer/{docId}", docId)
                 .exchange()
                 .expectStatus().isEqualTo(409)
                 .expectBody()
@@ -363,7 +385,7 @@ class ConversionControllerTest {
         when(conversionService.getJob(docId)).thenReturn(Optional.of(job));
 
         webTestClient.get()
-                .uri("/viewer/{docId}", docId)
+                .uri("/api/v1/viewer/{docId}", docId)
                 .exchange()
                 .expectStatus().isEqualTo(409)
                 .expectBody()
@@ -387,7 +409,7 @@ class ConversionControllerTest {
         when(conversionService.getJob(docId)).thenReturn(Optional.of(job));
 
         webTestClient.get()
-                .uri("/viewer/{docId}", docId)
+                .uri("/api/v1/viewer/{docId}", docId)
                 .exchange()
                 .expectStatus().isEqualTo(409)
                 .expectBody()
@@ -411,7 +433,7 @@ class ConversionControllerTest {
         when(conversionService.getJob(docId)).thenReturn(Optional.of(job));
 
         webTestClient.get()
-                .uri("/viewer/{docId}", docId)
+                .uri("/api/v1/viewer/{docId}", docId)
                 .exchange()
                 .expectStatus().isEqualTo(409)
                 .expectBody()
@@ -435,7 +457,7 @@ class ConversionControllerTest {
         when(conversionService.getJob(docId)).thenReturn(Optional.of(job));
 
         webTestClient.get()
-                .uri("/viewer/{docId}", docId)
+                .uri("/api/v1/viewer/{docId}", docId)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -453,7 +475,7 @@ class ConversionControllerTest {
         when(conversionService.getJob(docId)).thenReturn(Optional.empty());
 
         webTestClient.get()
-                .uri("/viewer/{docId}", docId)
+                .uri("/api/v1/viewer/{docId}", docId)
                 .exchange()
                 .expectStatus().isNotFound()
                 .expectBody()

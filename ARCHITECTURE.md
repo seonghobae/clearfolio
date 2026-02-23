@@ -1,6 +1,6 @@
 # Architecture Map
 
-Last updated: 2026-02-22
+Last updated: 2026-02-23
 
 ## System Purpose
 
@@ -17,13 +17,23 @@ Current state: viewer/state API is implemented in this repository; downstream S2
   - `POST /api/v1/convert/jobs`: async submit contract.
   - `POST /api/v1/convert/jobs/{jobId}/retry`: operator retry for dead-lettered jobs.
   - `GET /api/v1/convert/jobs/{jobId}`: status polling.
-  - `GET /viewer/{docId}` (+ aliases): viewer bootstrap/state-gated responses.
+  - `GET /api/v1/viewer/{docId}` (+ alias): viewer bootstrap JSON/state-gated responses.
+- `ViewerUiController` (`src/main/java/com/clearfolio/viewer/controller/ViewerUiController.java`)
+  - `GET /viewer/{docId}`: HTML viewer UI entrypoint (loading/failed/ready) that embeds PDF.js.
+- `ArtifactController` (`src/main/java/com/clearfolio/viewer/controller/ArtifactController.java`)
+  - `GET /artifacts/{docId}.pdf`: serves PDF bytes for SUCCEEDED jobs with basic HTTP Range support.
 - `DefaultDocumentConversionService` (`src/main/java/com/clearfolio/viewer/service/DefaultDocumentConversionService.java`)
   - Validation, content hash generation, dedupe lookup, repository persistence, worker enqueue.
 - `DefaultDocumentValidationService` (`src/main/java/com/clearfolio/viewer/service/DefaultDocumentValidationService.java`)
   - Enforces extension blocklist and size limits, including auditable policy-override exception lane.
 - `DefaultConversionWorker` (`src/main/java/com/clearfolio/viewer/service/DefaultConversionWorker.java`)
   - Runs conversion on a bounded executor with retry scheduling and dead-letter fallback.
+- `ArtifactStore` (`src/main/java/com/clearfolio/viewer/artifact/ArtifactStore.java`)
+  - Stores converted PDF bytes by docId.
+- `InMemoryArtifactStore` (`src/main/java/com/clearfolio/viewer/artifact/InMemoryArtifactStore.java`)
+  - In-memory artifact store implementation.
+- `PdfBoxArtifactGenerator` (`src/main/java/com/clearfolio/viewer/artifact/PdfBoxArtifactGenerator.java`)
+  - Generates a simple one-page PDF via PDFBox for the default conversion path.
 - `InMemoryConversionJobRepository` (`src/main/java/com/clearfolio/viewer/repository/InMemoryConversionJobRepository.java`)
   - In-memory job store and content-hash dedupe index.
 - `ConversionJob` (`src/main/java/com/clearfolio/viewer/model/ConversionJob.java`)

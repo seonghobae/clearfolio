@@ -12,6 +12,8 @@ import java.util.function.Function;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.clearfolio.viewer.artifact.ArtifactStore;
+import com.clearfolio.viewer.artifact.PdfArtifactGenerator;
 import com.clearfolio.viewer.model.ConversionJob;
 import com.clearfolio.viewer.model.ConversionJobStatus;
 import com.clearfolio.viewer.repository.ConversionJobRepository;
@@ -22,11 +24,12 @@ import com.clearfolio.viewer.repository.ConversionJobRepository;
 @Component
 public class DefaultConversionWorker implements ConversionWorker {
 
-    private static final long SIMULATED_WORK_TIME_MS = 25L;
     private static final long MIN_INITIAL_RETRY_DELAY_MS = 250L;
 
     private final ConversionJobRepository repository;
     private final Executor conversionExecutor;
+    private final ArtifactStore artifactStore;
+    private final PdfArtifactGenerator pdfArtifactGenerator;
     private final long retryInitialDelayMs;
     private final long retryMaxDelayMs;
     private final double retryBackoffMultiplier;
@@ -43,9 +46,13 @@ public class DefaultConversionWorker implements ConversionWorker {
     public DefaultConversionWorker(
             ConversionJobRepository repository,
             Executor conversionExecutor,
+            ArtifactStore artifactStore,
+            PdfArtifactGenerator pdfArtifactGenerator,
             com.clearfolio.viewer.config.ConversionProperties conversionProperties) {
         this.repository = repository;
         this.conversionExecutor = conversionExecutor;
+        this.artifactStore = artifactStore;
+        this.pdfArtifactGenerator = pdfArtifactGenerator;
         this.retryInitialDelayMs = Math.max(
                 MIN_INITIAL_RETRY_DELAY_MS,
                 conversionProperties.getRetryInitialDelayMs()
@@ -61,10 +68,14 @@ public class DefaultConversionWorker implements ConversionWorker {
     DefaultConversionWorker(
             ConversionJobRepository repository,
             Executor conversionExecutor,
+            ArtifactStore artifactStore,
+            PdfArtifactGenerator pdfArtifactGenerator,
             com.clearfolio.viewer.config.ConversionProperties conversionProperties,
             Function<UUID, String> conversionTask) {
         this.repository = repository;
         this.conversionExecutor = conversionExecutor;
+        this.artifactStore = artifactStore;
+        this.pdfArtifactGenerator = pdfArtifactGenerator;
         this.retryInitialDelayMs = Math.max(
                 MIN_INITIAL_RETRY_DELAY_MS,
                 conversionProperties.getRetryInitialDelayMs()
@@ -175,12 +186,15 @@ public class DefaultConversionWorker implements ConversionWorker {
     }
 
     private String performDefaultConversion(UUID jobId) {
-        try {
-            Thread.sleep(SIMULATED_WORK_TIME_MS);
-            return "/artifacts/" + jobId + ".pdf";
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("conversion interrupted", ex);
+        if (Thread.currentThread().isInterrupted()) {
+            throw new IllegalStateException("conversion interrupted");
         }
+
+        ConversionJob job = repository.findById(jobId)
+                .orElseThrow(() -> new IllegalStateException("job not found"));
+
+        byte[] pdfBytes = pdfArtifactGenerator.generatePdf(job);
+        artifactStore.putPdf(jobId, pdfBytes);
+        return "/artifacts/" + jobId + ".pdf";
     }
 }

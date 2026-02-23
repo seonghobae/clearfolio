@@ -20,6 +20,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
+import com.clearfolio.viewer.artifact.InMemoryArtifactStore;
+import com.clearfolio.viewer.artifact.PdfBoxArtifactGenerator;
 import com.clearfolio.viewer.config.ConversionProperties;
 import com.clearfolio.viewer.model.ConversionJob;
 import com.clearfolio.viewer.model.ConversionJobStatus;
@@ -39,6 +41,8 @@ class DefaultConversionWorkerTest {
         DefaultConversionWorker worker = new DefaultConversionWorker(
                 repository,
                 Runnable::run,
+                new InMemoryArtifactStore(),
+                new PdfBoxArtifactGenerator(),
                 conversionProperties,
                 id -> "/artifacts/" + id + ".pdf"
         );
@@ -46,6 +50,59 @@ class DefaultConversionWorkerTest {
         assertEquals(250L, invokeComputeRetryDelay(worker, 1));
         assertEquals(500L, invokeComputeRetryDelay(worker, 2));
         assertEquals(600L, invokeComputeRetryDelay(worker, 5));
+    }
+
+    @Test
+    void defaultConversionGeneratesAndStoresPdfArtifact() {
+        ConversionJobRepository repository = new InMemoryConversionJobRepository();
+        ConversionProperties conversionProperties = new ConversionProperties();
+        conversionProperties.setMaxRetryAttempts(1);
+
+        UUID jobId = UUID.randomUUID();
+        ConversionJob job = new ConversionJob(
+                jobId,
+                "report-\u2603.docx",
+                "application/octet-stream",
+                "hash-abc",
+                12L,
+                1
+        );
+        repository.save(job);
+
+        InMemoryArtifactStore artifactStore = new InMemoryArtifactStore();
+        DefaultConversionWorker worker = new DefaultConversionWorker(
+                repository,
+                Runnable::run,
+                artifactStore,
+                new PdfBoxArtifactGenerator(),
+                conversionProperties
+        );
+
+        worker.enqueue(jobId);
+
+        assertEquals(ConversionJobStatus.SUCCEEDED, job.getStatus());
+        byte[] stored = artifactStore.getPdf(jobId).orElseThrow();
+        assertTrue(stored.length > 4);
+        assertEquals("%PDF", new String(stored, 0, 4));
+        assertEquals("/artifacts/" + jobId + ".pdf", job.getConvertedResourcePath());
+    }
+
+    @Test
+    void performDefaultConversionThrowsWhenJobIsMissing() {
+        ConversionJobRepository repository = new InMemoryConversionJobRepository();
+        DefaultConversionWorker worker = new DefaultConversionWorker(
+                repository,
+                Runnable::run,
+                new InMemoryArtifactStore(),
+                new PdfBoxArtifactGenerator(),
+                new ConversionProperties()
+        );
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> invokePerformDefaultConversion(worker, UUID.randomUUID())
+        );
+        assertEquals("job not found", error.getMessage());
     }
 
     @Test
@@ -74,6 +131,8 @@ class DefaultConversionWorkerTest {
             DefaultConversionWorker worker = new DefaultConversionWorker(
                     repository,
                     executor,
+                    new InMemoryArtifactStore(),
+                    new PdfBoxArtifactGenerator(),
                     conversionProperties,
                     id -> {
                         attempts.incrementAndGet();
@@ -123,6 +182,8 @@ class DefaultConversionWorkerTest {
             DefaultConversionWorker worker = new DefaultConversionWorker(
                     repository,
                     executor,
+                    new InMemoryArtifactStore(),
+                    new PdfBoxArtifactGenerator(),
                     conversionProperties,
                     id -> {
                         if (attempts.getAndIncrement() == 0) {
@@ -174,6 +235,8 @@ class DefaultConversionWorkerTest {
             DefaultConversionWorker worker = new DefaultConversionWorker(
                     repository,
                     executor,
+                    new InMemoryArtifactStore(),
+                    new PdfBoxArtifactGenerator(),
                     conversionProperties,
                     id -> {
                         attempts.incrementAndGet();
@@ -218,6 +281,8 @@ class DefaultConversionWorkerTest {
         DefaultConversionWorker worker = new DefaultConversionWorker(
                 repository,
                 rejectingExecutor,
+                new InMemoryArtifactStore(),
+                new PdfBoxArtifactGenerator(),
                 conversionProperties
         );
 
@@ -252,6 +317,8 @@ class DefaultConversionWorkerTest {
         DefaultConversionWorker worker = new DefaultConversionWorker(
                 repository,
                 rejectingExecutor,
+                new InMemoryArtifactStore(),
+                new PdfBoxArtifactGenerator(),
                 conversionProperties
         );
 
@@ -272,6 +339,8 @@ class DefaultConversionWorkerTest {
         DefaultConversionWorker worker = new DefaultConversionWorker(
                 repository,
                 rejectingExecutor,
+                new InMemoryArtifactStore(),
+                new PdfBoxArtifactGenerator(),
                 new ConversionProperties()
         );
 
@@ -301,6 +370,8 @@ class DefaultConversionWorkerTest {
         DefaultConversionWorker worker = new DefaultConversionWorker(
                 repository,
                 rejectingExecutor,
+                new InMemoryArtifactStore(),
+                new PdfBoxArtifactGenerator(),
                 conversionProperties,
                 id -> "/artifacts/" + id + ".pdf"
         );
@@ -336,6 +407,8 @@ class DefaultConversionWorkerTest {
         DefaultConversionWorker worker = new DefaultConversionWorker(
                 repository,
                 rejectingExecutor,
+                new InMemoryArtifactStore(),
+                new PdfBoxArtifactGenerator(),
                 conversionProperties,
                 id -> "/artifacts/" + id + ".pdf"
         );
@@ -368,6 +441,8 @@ class DefaultConversionWorkerTest {
         DefaultConversionWorker worker = new DefaultConversionWorker(
                 repository,
                 Runnable::run,
+                new InMemoryArtifactStore(),
+                new PdfBoxArtifactGenerator(),
                 conversionProperties,
                 id -> {
                     attempts.incrementAndGet();
@@ -403,6 +478,8 @@ class DefaultConversionWorkerTest {
         DefaultConversionWorker worker = new DefaultConversionWorker(
                 repository,
                 Runnable::run,
+                new InMemoryArtifactStore(),
+                new PdfBoxArtifactGenerator(),
                 conversionProperties,
                 id -> {
                     attempts.incrementAndGet();
@@ -448,6 +525,8 @@ class DefaultConversionWorkerTest {
         DefaultConversionWorker worker = new DefaultConversionWorker(
                 repository,
                 Runnable::run,
+                new InMemoryArtifactStore(),
+                new PdfBoxArtifactGenerator(),
                 conversionProperties,
                 id -> {
                     attempts.incrementAndGet();
@@ -491,6 +570,8 @@ class DefaultConversionWorkerTest {
         DefaultConversionWorker worker = new DefaultConversionWorker(
                 repository,
                 Runnable::run,
+                new InMemoryArtifactStore(),
+                new PdfBoxArtifactGenerator(),
                 conversionProperties,
                 id -> {
                     attempts.incrementAndGet();
@@ -524,6 +605,8 @@ class DefaultConversionWorkerTest {
         DefaultConversionWorker worker = new DefaultConversionWorker(
                 repository,
                 Runnable::run,
+                new InMemoryArtifactStore(),
+                new PdfBoxArtifactGenerator(),
                 conversionProperties,
                 id -> {
                     throw new AssertionError("boom-error");
@@ -557,6 +640,8 @@ class DefaultConversionWorkerTest {
         DefaultConversionWorker worker = new DefaultConversionWorker(
                 repository,
                 Runnable::run,
+                new InMemoryArtifactStore(),
+                new PdfBoxArtifactGenerator(),
                 conversionProperties,
                 id -> {
                     throw new AssertionError();
@@ -590,6 +675,8 @@ class DefaultConversionWorkerTest {
         DefaultConversionWorker worker = new DefaultConversionWorker(
                 repository,
                 Runnable::run,
+                new InMemoryArtifactStore(),
+                new PdfBoxArtifactGenerator(),
                 conversionProperties,
                 id -> {
                     throw new AssertionError("   ");
@@ -631,6 +718,8 @@ class DefaultConversionWorkerTest {
         DefaultConversionWorker worker = new DefaultConversionWorker(
                 repository,
                 Runnable::run,
+                new InMemoryArtifactStore(),
+                new PdfBoxArtifactGenerator(),
                 conversionProperties,
                 id -> {
                     throw new TestVirtualMachineError("vm-boom");
@@ -649,6 +738,8 @@ class DefaultConversionWorkerTest {
         DefaultConversionWorker worker = new DefaultConversionWorker(
                 repository,
                 Runnable::run,
+                new InMemoryArtifactStore(),
+                new PdfBoxArtifactGenerator(),
                 new ConversionProperties()
         );
 

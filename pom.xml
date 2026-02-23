@@ -22,6 +22,8 @@
     <maven.compiler.release>${java.version}</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <argLine></argLine>
+    <pdfbox.version>3.0.3</pdfbox.version>
+    <pdfjs.dist.version>4.10.38</pdfjs.dist.version>
   </properties>
 
   <dependencies>
@@ -39,6 +41,18 @@
       <groupId>org.apache.tika</groupId>
       <artifactId>tika-parsers-standard-package</artifactId>
       <version>3.2.2</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.pdfbox</groupId>
+      <artifactId>pdfbox</artifactId>
+      <version>${pdfbox.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.webjars.npm</groupId>
+      <artifactId>pdfjs-dist</artifactId>
+      <version>${pdfjs.dist.version}</version>
     </dependency>
 
     <dependency>
