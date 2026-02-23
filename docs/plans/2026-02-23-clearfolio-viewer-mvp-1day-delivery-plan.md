@@ -77,11 +77,15 @@ All commands are copy/pasteable. Replace placeholders in ALL CAPS.
 ### 0) Branch + continuity (existing PR-first)
 
 ```bash
-# Best-effort duplicate PR discovery (canonical PR-first).
-PYTHONPATH="$HOME/.config/opencode" python -m scripts.pr_continuity --json || true
+# Best-effort PR continuity check (existing PR-first).
+# If the current branch already has a PR, `gh pr view` will succeed.
+gh pr view --json number,url,headRefName,headRefOid 2>/dev/null || true
 
 git checkout -b BRANCH_NAME
 git status
+
+# After branch creation, verify whether a PR already exists for this head.
+gh pr view --json number,url,headRefName,headRefOid 2>/dev/null || true
 ```
 
 Notes:
@@ -95,7 +99,7 @@ MVP endpoints and invariants (backend):
 - `POST /api/v1/convert/jobs` accepts multipart upload and returns quickly with `jobId` + `statusUrl`.
 - `GET /api/v1/convert/jobs/{jobId}` polls job state.
 - `POST /api/v1/convert/jobs/{jobId}/retry` re-queues dead-lettered jobs (operator lane).
-- `GET /viewer/{docId}` is canonical viewer bootstrap entry; aliases remain compatible.
+- `GET /viewer/{docId}` is canonical HTML viewer entrypoint; bootstrap JSON remains at `/api/v1/viewer/{docId}`.
 - Error payloads are stable and consistent (`ApiErrorResponse`), with validation for bad inputs.
 - Blocked formats are rejected unless explicit policy override header is present.
 
@@ -162,6 +166,9 @@ EOF
 ### 6) Security verification (SAST + GitHub code scanning / required checks)
 
 ```bash
+# GitHub CLI authentication must be configured for `gh pr` / `gh api` calls.
+gh auth status
+
 # SAST (Semgrep)
 semgrep --config auto --metrics=off --error \
   --json --output "${EVIDENCE_DIR}/semgrep.json" src/main/java

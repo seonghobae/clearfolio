@@ -112,7 +112,7 @@ Later (examples; not exhaustive):
 ## 7) UX Consistency Requirements
 
 - Viewer layout and states are consistent across entrypoints (desktop/tablet/phone): loading, empty/no-access, blocked-by-policy, conversion-failed, and success.
-- UI/UX Standard (Ver.3.0, 2022-11-21) applies for web-based internal systems:
+- UI/UX Standard (Ver.3.0, 2022-11-21) applies for web-based internal systems (checklist: `docs/ui/ux-ver3-checklist.md`):
   - Breakpoints: PC (>=1024), Tablet (768–1024), Phone (<768).
   - No horizontal scroll at recommended resolutions.
   - Required fields (when present) marked with `*`.
@@ -278,7 +278,7 @@ Reference: `docs/engineering/acceptance-criteria.md`.
 The one-day delivery motion is the default execution path for this internal capability.
 
 - Workflow: `docs/workflow/one-day-delivery-plan.md`
-- Detailed schedule and commands: `docs/plans/2026-02-20-24h-customer-delivery-plan.md`
+- Detailed schedule and commands: `docs/plans/2026-02-23-clearfolio-viewer-mvp-1day-delivery-plan.md`
 
 Minimum one-day deliverables:
 

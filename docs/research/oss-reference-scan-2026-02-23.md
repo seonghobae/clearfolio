@@ -11,7 +11,7 @@ License policy note:
 ## Candidates
 
 | Repo | License | What we borrow (concept) | Notes / cautions |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `https://github.com/mozilla/pdf.js` | Apache-2.0 | The baseline for a full-featured PDF viewer shell (toolbar, thumbnails, search, render backpressure patterns). | Integration is non-trivial (assets, worker, range requests, CORS). Treat as frontend reference, not a small widget. |
 | `https://github.com/filebrowser/filebrowser` | Apache-2.0 | Unified preview shell pattern: one route that chooses renderer by MIME/extension and keeps consistent actions/navigation. | Their PDF preview is not PDF.js-grade; treat as an IA/UX/layout reference, not rendering reference. |
 | `https://github.com/jodconverter/jodconverter` | Apache-2.0 | Server-side conversion pattern using LibreOffice/OpenOffice: lifecycle, timeouts, restart on failure, temp isolation. | LibreOffice is heavyweight; requires strict resource/time limits and likely container isolation. |
