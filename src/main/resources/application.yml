@@ -15,3 +15,9 @@ conversion:
   retry-max-delay-ms: 5000
   retry-backoff-multiplier: 2.0
   max-upload-size-bytes: 5242880
+
+viewer:
+  security:
+    # Default is safe and non-breaking for same-origin usage.
+    # Set an explicit allowlist if the viewer must be embedded cross-origin.
+    frame-ancestors: self

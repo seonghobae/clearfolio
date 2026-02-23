@@ -2,7 +2,7 @@
 
 This repository contains the MVP backend for an integrated document viewer platform.
 The current implementation includes non-blocking submit, job status polling, and
-an asynchronous conversion simulation for early pattern validation.
+asynchronous conversion that produces an in-memory PDF artifact for preview.
 
 ## Quick Start
 
@@ -21,8 +21,9 @@ an asynchronous conversion simulation for early pattern validation.
 - `GET /api/v1/convert/jobs/{jobId}`: poll conversion status and lifecycle fields.
 - `POST /api/v1/convert/jobs` response includes `jobId`, `status`, and `statusUrl`.
 - `POST /api/v1/convert/jobs/{jobId}/retry`: operator-triggered retry for dead-lettered jobs.
-- `GET /viewer/{docId}`: canonical viewer bootstrap entrypoint.
-- `GET /api/v1/viewer/{docId}` and `GET /api/v1/convert/viewer/{docId}`: alias routes for compatibility.
+- `GET /viewer/{docId}`: canonical HTML viewer UI entrypoint (mobile-safe loading/failed/ready states).
+- `GET /api/v1/viewer/{docId}` and `GET /api/v1/convert/viewer/{docId}`: viewer bootstrap JSON (unchanged response shape).
+- `GET /artifacts/{docId}.pdf`: serves converted PDF bytes (SUCCEEDED jobs only) with single-range support.
 - Errors follow shared shape (`errorCode`, optional `code`, `message`, `traceId`, `details`) for 404/409/400/500 paths.
 - `GET /healthz`: readiness probe.
 - HWP/HWPX are blocked by configuration.
@@ -30,7 +31,7 @@ an asynchronous conversion simulation for early pattern validation.
 ## Compatibility notes
 
 - API contract has been kept backward-compatible with the existing jobs + viewer flow.
-- `GET /viewer/{docId}` remains the canonical entry route.
+- `GET /viewer/{docId}` remains the canonical entry route, but now serves HTML (PDF.js viewer).
 - Alias endpoints remain stable in behavior and response shape expectations.
 - Dead-letter terminal cases keep `status=FAILED` in API payloads and set
   `deadLettered=true` when retries are exhausted.

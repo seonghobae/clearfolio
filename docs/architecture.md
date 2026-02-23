@@ -1,6 +1,6 @@
 # Conversion Service Architecture
 
-Last updated: 2026-02-22
+Last updated: 2026-02-23
 
 This repository currently ships an MVP backend for integrated document conversion/viewer entry with a non-blocking web stack.
 
@@ -15,7 +15,9 @@ This repository currently ships an MVP backend for integrated document conversio
 - Submit flow (`POST /api/v1/convert/jobs`): validation -> blocked-format policy evaluation (default block, optional auditable override headers) -> content hash dedupe -> enqueue async conversion -> return `202`.
 - Status flow (`GET /api/v1/convert/jobs/{jobId}`): return lifecycle snapshot (`SUBMITTED`, `PROCESSING`, `SUCCEEDED`, `FAILED`) with retry metadata.
 - Operator recovery flow (`POST /api/v1/convert/jobs/{jobId}/retry`): validate `X-Clearfolio-Operator-Id` -> allow only dead-lettered jobs -> reset state -> enqueue async conversion -> return `202`.
-- Preview flow (`GET /viewer/{docId}` and aliases): return bootstrap on `SUCCEEDED` with deterministic `sourceExtension`/`rendererAdapter`; return `409` for not-ready/failed states; return `404` when missing.
+- Viewer UI flow (`GET /viewer/{docId}`): return HTML shell with mobile-safe loading/failed/ready states; when ready, embed PDF.js.
+- Bootstrap flow (`GET /api/v1/viewer/{docId}` and `GET /api/v1/convert/viewer/{docId}`): return bootstrap JSON on `SUCCEEDED` with deterministic `sourceExtension`/`rendererAdapter`; return `409` for not-ready/failed states; return `404` when missing.
+- Artifact flow (`GET /artifacts/{docId}.pdf`): serve converted PDF bytes for `SUCCEEDED` jobs only (single-range support).
 - Health flow (`GET /healthz`): readiness probe.
 
 ## S2S delivery chain (documented target)

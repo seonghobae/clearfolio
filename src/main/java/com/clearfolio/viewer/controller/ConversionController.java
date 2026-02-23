@@ -143,8 +143,12 @@ public class ConversionController {
      * @param docId document identifier
      * @return viewer bootstrap payload for a converted document
      */
-    @GetMapping({"/viewer/{docId}", "/api/v1/viewer/{docId}", "/api/v1/convert/viewer/{docId}"})
+    @GetMapping({"/api/v1/viewer/{docId}", "/api/v1/convert/viewer/{docId}"})
     public ViewerBootstrapResponse getViewer(@PathVariable("docId") UUID docId) {
+        return getViewerBootstrap(docId);
+    }
+
+    private ViewerBootstrapResponse getViewerBootstrap(UUID docId) {
         ConversionJob job = conversionService.getJob(docId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "job not found"));
 
@@ -162,4 +166,5 @@ public class ConversionController {
                 job.getStatus() + " not ready yet. retry in a few seconds"
         );
     }
+
 }
